@@ -14,9 +14,16 @@ jobs:
           submodules: recursive
 
       - name: Build GDS
-        uses: TinyTapeout/tt-gds-action@ttihp26b
+        # Fork of TinyTapeout/tt-gds-action@ttihp26b (Uri's September PDK
+        # precheck bump) plus a pdk-version input: LibreLane pins the January
+        # 2026 IHP build in its own pdk_hashes.yaml, whose KLayout deck fails
+        # on IHP's SRAM cells, and no 3.0.x release moves that pin.
+        uses: kdp1965/tt-gds-action@ttihp26b-pdk-2026-09
         with:
           pdk: ihp-sg13g2
+          # The same build precheck/action.yml installs (2026-09-07): it
+          # carries IHP's August SRAM prBoundary fix and the reworked deck.
+          pdk-version: 22f43352dd8219f9007eb659e422e0d5fe28c5fb
           # The LibreLane every local run of this tree was done with (the
           # action's default is 3.0.5; both pin the same IHP PDK revision)
           #librelane-version: 3.0.5
