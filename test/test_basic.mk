@@ -8,6 +8,14 @@ TOPLEVEL_LANG ?= verilog
 SRC_DIR = $(PWD)/../src
 PROJECT_SOURCES = project.v peri*.v tinyQV/cpu/*.v tinyQV/peri/uart/uart_tx.v user_peripherals/*/*.v
 
+# The PRISM's SRAM FIFOs: how many (0/1/2) and their address width.  The
+# tests read PRISM_SRAM_FIFO from the environment as well (the ones that
+# need a FIFO are skipped when there is none), so it is set and exported
+# outside the RTL / gate-level branches.
+PRISM_SRAM_AW ?= 9
+PRISM_SRAM_FIFO ?= 2
+export PRISM_SRAM_FIFO
+
 ifneq ($(GATES),yes)
 
 ifneq ($(SYNTH),yes)
@@ -24,8 +32,6 @@ VERILOG_SOURCES += $(SRAM_MODEL_DIR)/RM_IHPSG13_1P_2048x32_c2_bm_bist.v
 VERILOG_SOURCES += $(SRAM_MODEL_DIR)/RM_IHPSG13_1P_1024x32_c2_bm_bist.v
 VERILOG_SOURCES += $(SRAM_MODEL_DIR)/RM_IHPSG13_1P_512x32_c2_bm_bist.v
 COMPILE_ARGS 		+= -DFUNCTIONAL
-PRISM_SRAM_AW ?= 9
-PRISM_SRAM_FIFO ?= 2
 COMPILE_ARGS 		+= -DPRISM_SRAM_AW=$(PRISM_SRAM_AW) -DPRISM_SRAM_FIFO=$(PRISM_SRAM_FIFO)
 COMPILE_ARGS 		+= -DPURE_RTL
 COMPILE_ARGS 		+= -I$(SRC_DIR)
@@ -70,10 +76,10 @@ VERILOG_SOURCES += $(PDK_ROOT)/ihp-sg13g2/libs.ref/sg13g2_stdcell/verilog/sg13g2
 # this gets copied in by the GDS action workflow
 #VERILOG_SOURCES += ../runs/wokwi/results/placement/tt_um_pettit_js_prism.pnl.v
 VERILOG_SOURCES += $(PWD)/gate_level_netlist.v
-# The CFGMEM macros are black boxes in the tile netlist: add their powered
-# netlists (from DFFRAM.librelane products/<macro>/pnl).
-VERILOG_SOURCES += $(PWD)/../macros/CFGMEM_IHP16/CFGMEM_IHP16.pnl.v
-VERILOG_SOURCES += $(PWD)/../macros/CFGMEM_IHP_LEFT16/CFGMEM_IHP_LEFT16.pnl.v
+# The CFGMEM macros are black boxes in the tile netlist: add their netlists
+# (no power ports, like the tile netlist and the sg13g2 cell models).
+VERILOG_SOURCES += $(PWD)/../macros/CFGMEM_IHP16/CFGMEM_IHP16.nl.v
+VERILOG_SOURCES += $(PWD)/../macros/CFGMEM_IHP_LEFT16/CFGMEM_IHP_LEFT16.nl.v
 
 endif
 
