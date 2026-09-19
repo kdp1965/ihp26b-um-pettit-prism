@@ -19,7 +19,7 @@ jobs:
           pdk: ihp-sg13g2
           # The LibreLane every local run of this tree was done with (the
           # action's default is 3.0.5; both pin the same IHP PDK revision)
-          librelane-version: 3.0.2
+          #librelane-version: 3.0.5
 
   precheck:
     needs: gds
