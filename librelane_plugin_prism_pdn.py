@@ -104,6 +104,15 @@ class MouthKeepouts(OdbpyStep):
 
 
 @Step.factory.register()
+class DropKeepouts(OdbpyStep):
+    id = "Project.DropKeepouts"
+    name = "Drop the Placement Keep-outs"
+
+    def get_script_path(self):
+        return os.path.join(HERE, "odb_keepout_drop.py")
+
+
+@Step.factory.register()
 class SramPinDiodePlacement(OdbpyStep):
     id = "Project.SramPinDiodePlacement"
     name = "Diodes on SRAM Input Pins"
