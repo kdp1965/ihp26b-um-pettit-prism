@@ -34,8 +34,10 @@ def is_sram(master):
               "(e.g. Metal4 columns under TopMetal1 stripes): the stripes drawn on the columns then get via stacks down to them")
 @click.option("--clearance", "clearance_um", default=0.24, type=float, help="Spacing (um) kept between a drawn stripe and the other net's macro rails / tile pins on the stripe layer")
 @click.option("--stack-pitch", default=10.0, type=float, help="Spacing (um) of the via stacks along an SRAM power column")
+@click.option("--pin-face-margin", default=3.0, type=float, help="No rail via stack within this distance (um) of a macro edge that carries pins: "
+              "the stack's landing patches would sit on the pins' escape route (an unfixable short)")
 @click_odb
-def extend(reader, layer, sram_layer, clearance_um, stack_pitch):
+def extend(reader, layer, sram_layer, clearance_um, stack_pitch, pin_face_margin):
     block = reader.block
     tech = reader.tech
     m = tech.findLayer(layer)
@@ -123,6 +125,35 @@ def extend(reader, layer, sram_layer, clearance_um, stack_pitch):
     for nn in sram_cols:
         sram_cols[nn] = sorted(set(sram_cols[nn]))
     clearance = int(clearance_um * dbu)      # spacing on the stripe layer (0.24 um for a 2.1 um Metal4 wire, 1.64 on TopMetal1)
+
+    # Macro edges that carry signal pins (x range, y of the edge): no rail via
+    # stack may land within pin_face_margin of them.  A stack's Metal1-Metal3
+    # patches are 1.9 um wide and sit on the row rail 1-2 um beyond the edge,
+    # exactly where the pins' escape wires must go; the router then has no
+    # legal connection for those pins (the stuck single short of run g2_8x4).
+    pin_faces = []
+    edge_tol = int(3.0 * dbu)
+    for inst in block.getInsts():
+        if not inst.getMaster().isBlock():
+            continue
+        ib = inst.getBBox()
+        top = bottom = 0
+        for it in inst.getITerms():
+            if it.getMTerm().getSigType() != "SIGNAL":
+                continue
+            bb = it.getBBox()
+            if ib.yMax() - bb.yMax() <= edge_tol:
+                top += 1
+            if bb.yMin() - ib.yMin() <= edge_tol:
+                bottom += 1
+        if top:
+            pin_faces.append((ib.xMin(), ib.xMax(), ib.yMax()))
+        if bottom:
+            pin_faces.append((ib.xMin(), ib.xMax(), ib.yMin()))
+    face_margin = int(pin_face_margin * dbu)
+
+    def near_pin_face(x, y):
+        return any(fx0 - face_margin <= x <= fx1 + face_margin and abs(y - fy) <= face_margin for fx0, fx1, fy in pin_faces)
 
     def inside_sram(b):
         return any(r.xMin() <= b.xMin() and b.xMax() <= r.xMax() and r.yMin() <= b.yMin() and b.yMax() <= r.yMax()
@@ -214,6 +245,8 @@ def extend(reader, layer, sram_layer, clearance_um, stack_pitch):
                 for r in rails:
                     if r.xMin() <= cx <= r.xMax():
                         ry = (r.yMin() + r.yMax()) // 2
+                        if near_pin_face(cx, ry):
+                            continue
                         if not any(abs(h - ry) < 0.3 * dbu for h in have):
                             for via in rail_vias:
                                 odb.dbSBox_create(swire, via, cx, ry, "STRIPE")
@@ -471,6 +504,8 @@ def extend(reader, layer, sram_layer, clearance_um, stack_pitch):
                     for r in rails:
                         if r.xMin() <= cx <= r.xMax() and (r.yMax() <= ib.yMin() or r.yMin() >= ib.yMax()):
                             ry = (r.yMin() + r.yMax()) // 2
+                            if near_pin_face(cx, ry):
+                                continue
                             for via in rail_vias:
                                 odb.dbSBox_create(swire, via, cx, ry, "STRIPE")
                 print(f"[INFO] {inst.getName()}: {net_name}: {removed} tile stripes replaced by {len(columns)} on the macro's tracks "
@@ -512,6 +547,18 @@ def extend(reader, layer, sram_layer, clearance_um, stack_pitch):
                         odb.dbBox_create(bpin, m, r.xMin(), ylo, r.xMax(), yhi)
                     added += 1
         print(f"[INFO] {net_name}: {len(stripes)} tile stripes kept, {added} full-height stripes added over macro pin columns")
+
+        # pdngen's own rail stacks (and any patches) inside a pin-face band go too
+        cleared = 0
+        for b in list(swire.getWires()):
+            if inside_sram(b):
+                continue
+            lyr = b.getTechLayer()
+            is_via = lyr is None
+            is_patch = (not is_via) and lyr.getName() not in (layer, "Metal1") and (b.xMax() - b.xMin()) < (b.yMax() - b.yMin()) * 8
+            if (is_via or is_patch) and near_pin_face((b.xMin() + b.xMax()) // 2, (b.yMin() + b.yMax()) // 2):
+                odb.dbSBox_destroy(b); cleared += 1
+        print(f"[INFO] {net_name}: {cleared} via / patch shapes removed from the {pin_face_margin} um bands beside {len(pin_faces)} macro pin faces")
 
         # ---- SRAM columns on a lower layer: via stacks from the stripe down to
         # every column rect that carries a stripe, spaced along the column
