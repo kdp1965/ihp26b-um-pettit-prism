@@ -16,6 +16,8 @@
   "EXTEND_STRIPES_LAYER": "TopMetal1",
   "EXTEND_STRIPES_SRAM_LAYER": "Metal4",
   "EXTEND_STRIPES_CLEARANCE": 1.7,
+  "//sram_columns": "Feed every supply column of the SRAMs, not just the ones the tile grid crosses: the left corridor uses only 73 of its 417 um for TopMetal1 and the layer runs at 6% after routing, so the stripes are affordable and the macro's internal mesh carries much less current (13 of 36 VDD! / 13 of 36 VSS! / 11 of 32 VDDARRAY! columns fed before).",
+  "EXTEND_STRIPES_SRAM_ALL_COLUMNS": 1,
   "//srams": "Two 512x32 SRAM FIFOs (one per shard, 2 KB each) flush left with their pin faces toward each other; the 99.7 um gap holds both wrappers. Their power columns are Metal4 (2.81 um wide, VDD/VSS alternating every 5.62 um), so the TopMetal1 tile stripes crossing them are moved onto columns and tied down with Via4 + TopVia1 stacks by odb_stripes.py. Magic extracts the SRAM from its LEF abstract (Metal4 OBS keep-out bar at the VDD!/VDDARRAY! break), so the illegal-overlap check is waived as on CMOS5L; KLayout DRC and LVS are the verdict.",
   "ROUTING_OBSTRUCTIONS": [
     "Metal2 3.36 3.78 420.0 192.5",

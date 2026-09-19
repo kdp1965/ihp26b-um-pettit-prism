@@ -35,6 +35,7 @@ class ExtendPowerStripes(OdbpyStep):
         _Variable("EXTEND_STRIPES_CLEARANCE", _Decimal, "Spacing kept between a drawn stripe and the other net's macro rails or tile pins on the stripe layer.", units="µm", default=_Decimal("0.24")),
         _Variable("EXTEND_STRIPES_STACK_PITCH", _Decimal, "Spacing of the via stacks along an SRAM power column.", units="µm", default=_Decimal("10")),
         _Variable("EXTEND_STRIPES_PIN_FACE_MARGIN", _Decimal, "No rail via stack within this distance of a macro edge that carries pins (the stack would block the pins' escape).", units="µm", default=_Decimal("3")),
+        _Variable("EXTEND_STRIPES_SRAM_ALL_COLUMNS", bool, "Put a stripe on every legal supply column of an IHP SRAM rather than only the ones the tile grid and the per-region minimum need.", default=False),
     ]
 
     def get_script_path(self):
@@ -49,6 +50,7 @@ class ExtendPowerStripes(OdbpyStep):
         ]
         if self.config.get("EXTEND_STRIPES_SRAM_LAYER"):
             cmd += ["--sram-layer", self.config["EXTEND_STRIPES_SRAM_LAYER"]]
+        cmd += ["--sram-all-columns" if self.config["EXTEND_STRIPES_SRAM_ALL_COLUMNS"] else "--sram-grid-columns"]
         return cmd
 
 

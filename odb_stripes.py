@@ -36,8 +36,12 @@ def is_sram(master):
 @click.option("--stack-pitch", default=10.0, type=float, help="Spacing (um) of the via stacks along an SRAM power column")
 @click.option("--pin-face-margin", default=3.0, type=float, help="No rail via stack within this distance (um) of a macro edge that carries pins: "
               "the stack's landing patches would sit on the pins' escape route (an unfixable short)")
+@click.option("--sram-all-columns/--sram-grid-columns", default=False,
+              help="Put a stripe on every legal supply column of an IHP SRAM, not only the ones the "
+                   "tile grid and the per-region minimum ask for.  The macro's internal mesh then "
+                   "carries far less current; it costs one full-height stripe per column in that corridor")
 @click_odb
-def extend(reader, layer, sram_layer, clearance_um, stack_pitch, pin_face_margin):
+def extend(reader, layer, sram_layer, clearance_um, stack_pitch, pin_face_margin, sram_all_columns):
     block = reader.block
     tech = reader.tech
     m = tech.findLayer(layer)
@@ -397,6 +401,18 @@ def extend(reader, layer, sram_layer, clearance_um, stack_pitch, pin_face_margin
                 chosen["VPWR"].append(c)
                 print(f"[INFO] {inst.getName()}: VPWR stripe added at {where(c)} so the band has two pairs")
                 complete_pairs()
+
+        # 4. every remaining legal column, when the corridor can afford it:
+        #    the columns are all one net inside the macro, so feeding more of
+        #    them shortens the path from the grid to the far side of an array
+        if sram_all_columns:
+            added = {"VPWR": 0, "VGND": 0}
+            for nn in ("VPWR", "VGND"):
+                for c in sorted(free(nn), key=centre):
+                    chosen[nn].append(c)
+                    added[nn] += 1
+            print(f"[INFO] {inst.getName()}: all-columns: +{added['VPWR']} VPWR / +{added['VGND']} VGND "
+                  f"stripes on the remaining legal columns")
 
         print(f"[INFO] {inst.getName()}: " + ", ".join(f"{r}: {pairs(r)} pairs" for r in regions) +
               f"; VPWR {len(chosen['VPWR'])} / VGND {len(chosen['VGND'])} stripes for the "
