@@ -284,7 +284,7 @@ module tqvp_prism #( parameter SRAM_FIFO = 2, parameter SRAM_AW = 9, parameter C
     localparam       CFG3_SMP_TIMER = 27;   //       [27] count1 clear / load on the edge
     localparam       CFG3_SMP_INV   = 28;   //       [28] flag2 swaps rising and falling
 
-    localparam  FIFO_DEPTH  = 16;
+    localparam  FIFO_DEPTH  = 64;
     localparam  FIFO_AW     = 4;
 
     wire                prism_enable;
