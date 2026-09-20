@@ -9,7 +9,7 @@
       "+Checker.TrDRC": "Project.DropKeepouts"
     }
   },
-  "PL_TARGET_DENSITY_PCT": 52,
+  "PL_TARGET_DENSITY_PCT": 55,
   "//pdn": "Tiny Tapeout sg13g2 tile PDN: single layer (TopMetal1 vertical stripes, pitch 38.87 as in the ttihp-verilog-template config); pdn_cfg.tcl is LibreLane's without the per-macro grid (PDN-0233 with one layer), ERROR_ON_PDN_VIOLATIONS off because pdngen's check runs before the stripe step bridges the macro pins - LVS is the verdict",
   "FP_PDN_MULTILAYER": 0,
   "FP_PDN_VPITCH": 38.87,
@@ -63,7 +63,7 @@
   "FP_IO_VLENGTH": 2,
   "RUN_CTS": 1,
   "//": "Placement keep-outs (soft, density cap) in the rows outside each CFGMEM column's tile-facing edge at the pair gaps: every stalled route died there (see docs 4z.6)",
-  "MOUTH_KEEPOUT_WIDTH": 60,
+  "MOUTH_KEEPOUT_WIDTH": 30,
   "MOUTH_KEEPOUT_MARGIN": 20,
   "MOUTH_KEEPOUT_MAX_DENSITY": 0.25,
   "MOUTH_KEEPOUT_INWARD": 0,
