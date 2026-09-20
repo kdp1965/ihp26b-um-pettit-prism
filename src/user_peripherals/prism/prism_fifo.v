@@ -18,7 +18,7 @@
 // finds it.
 //
 // Constant-table mode (tab_en, CONST_TAB in prism_periph.v): the head is
-// row tab_idx instead of the read pointer's row, so the 16 rows serve as
+// row tab_idx instead of the read pointer's row, so the first 16 rows serve as
 // addressable constants for OUT_COMM_LOAD; pushes and flushes still work
 // (that is how the host loads the table).
 

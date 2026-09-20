@@ -1,6 +1,8 @@
 # The PRISM unit tests, one class per subject.  Each runs on the shared
 # PrismBench (bench.py) after a reset; test.py wraps them as cocotb tests.
 
+import os
+
 import cocotb
 from cocotb.triggers import ClockCycles, RisingEdge, FallingEdge
 
@@ -70,28 +72,28 @@ class RegisterTest(PrismTest):
         self.log("FIFO and CRC registers")
         for base in (0, SHARD1):
             await tqv.write_word_reg(REG_CFG0 + base, CFG_FIFO_DIR_TX)
-            assert await tqv.read_word_reg(REG_FIFO_ST + base) & 0x1F01 == 0x0001   # empty, count 0
+            assert await tqv.read_word_reg(REG_FIFO_ST + base) & 0x3FFF01 == 0x000001   # empty, count 0
             for b in (0x11, 0x22, 0x33):
                 await tqv.write_byte_reg(REG_FIFO + base, b)
             st = await tqv.read_word_reg(REG_FIFO_ST + base)
-            assert (st >> 8) & 0x1F == 3 and st & 0x3 == 0, f"{st:#x}"
+            assert (st >> 8) & 0x3FFF == 3 and st & 0x3 == 0, f"{st:#x}"
             assert await tqv.read_byte_reg(REG_FIFO + base) == 0x11
             assert await tqv.read_byte_reg(REG_FIFO + base) == 0x11               # TX: no pop on read
-            for b in range(13):
+            for b in range(FIFO_DEPTH - 3):
                 await tqv.write_byte_reg(REG_FIFO + base, 0x40 + b)
             st = await tqv.read_word_reg(REG_FIFO_ST + base)
-            assert (st >> 8) & 0x1F == 16 and st & 0x2, f"{st:#x}"                  # full
+            assert (st >> 8) & 0x3FFF == FIFO_DEPTH and st & 0x2, f"{st:#x}"        # full
             await tqv.write_byte_reg(REG_FIFO + base, 0xEE)                        # dropped
-            assert (await tqv.read_word_reg(REG_FIFO_ST + base) >> 8) & 0x1F == 16
+            assert (await tqv.read_word_reg(REG_FIFO_ST + base) >> 8) & 0x3FFF == FIFO_DEPTH
             await tqv.write_word_reg(REG_FIFO_ST + base, 0)                        # flush
-            assert await tqv.read_word_reg(REG_FIFO_ST + base) & 0x1F01 == 0x0001
+            assert await tqv.read_word_reg(REG_FIFO_ST + base) & 0x3FFF01 == 0x000001
             await tqv.write_word_reg(REG_CRC_POLY + base, 0x04C11DB7)
             await tqv.write_word_reg(REG_CRC_EXP + base, 0xDEBB20E3)
             assert await tqv.read_word_reg(REG_CRC_POLY + base) == 0x04C11DB7
             assert await tqv.read_word_reg(REG_CRC_EXP + base) == 0xDEBB20E3
             await tqv.write_word_reg(REG_CFG0 + base, 0)
         # the other shard's FIFO must be untouched by the flush above
-        assert await tqv.read_word_reg(REG_FIFO_ST) & 0x1F01 == 0x0001
+        assert await tqv.read_word_reg(REG_FIFO_ST) & 0x3FFF01 == 0x000001
 
         # FIFO flag input slots: inputs 20 / 21 show two of the own FIFO's four
         # flags and, for shard 0 unfractured, 26 / 27 two of FIFO B's.  Slot
@@ -100,9 +102,9 @@ class RegisterTest(PrismTest):
         self.log("FIFO flag input selects")
         await tqv.write_word_reg(REG_FRAC_CFG, 0)
         await tqv.write_word_reg(REG_CFG0 + SHARD1, CFG_FIFO_DIR_TX)
-        await tqv.write_word_reg(REG_CFG1 + SHARD1, (4 << 16) | (13 << 20))       # B: ae = count <= 4, af = count >= 3
-        for b in range(3):
-            await tqv.write_byte_reg(REG_FIFO + SHARD1, b)                        # B holds 3: ae = af = 1
+        await tqv.write_word_reg(REG_CFG1 + SHARD1, (4 << 16) | (15 << 20))       # B: ae = count <= 16, af = count >= 4 (4-byte units)
+        for b in range(4):
+            await tqv.write_byte_reg(REG_FIFO + SHARD1, b)                        # B holds 4: ae = af = 1
         async def flag_slots():
             v = await tqv.read_word_reg(REG_IN_DATA)
             return ((v >> 20) & 1, (v >> 21) & 1, (v >> 26) & 1, (v >> 27) & 1)
@@ -386,7 +388,7 @@ class SpiSlaveTest(PrismTest):
 
         self.log("Testing RX FIFO and CRC8")
         st = await tqv.read_word_reg(REG_FIFO_ST)
-        assert (st >> 8) & 0x1F == len(spi_data), f"{st:#x}"
+        assert (st >> 8) & 0x3FFF == len(spi_data), f"{st:#x}"
         for rx in spi_data:
             assert await tqv.read_byte_reg(REG_FIFO) == rx
         assert await tqv.read_word_reg(REG_FIFO_ST) & 0x1 == 1
@@ -588,7 +590,7 @@ class I2cMasterTest(PrismTest):
             await self.clocks(10)
             assert await bench.curr_state() == 0 and not await bench.irq()
             got = []
-            for _ in range((await tqv.read_word_reg(REG_FIFO_ST) >> 8) & 0x1F):
+            for _ in range((await tqv.read_word_reg(REG_FIFO_ST) >> 8) & 0x3FFF):
                 got.append(await tqv.read_byte_reg(REG_FIFO))
             return got
 
@@ -620,7 +622,7 @@ class I2cMasterTest(PrismTest):
         assert slave.events == [('start',), ('addr', (ADDR + 1) << 1, False), ('stop',)], slave.events
         assert got == []
         st = await tqv.read_word_reg(REG_FIFO_ST + SHARD1)
-        assert (st >> 8) & 0x1F == 1, f"{st:#x}"
+        assert (st >> 8) & 0x3FFF == 1, f"{st:#x}"
         await tqv.write_word_reg(REG_FIFO_ST + SHARD1, 0)
 
         self.log("read from an absent slave: NAK, nothing read")
@@ -666,7 +668,7 @@ class I2cSlaveTest(PrismTest):
 
         async def fifo_a():
             got = []
-            for _ in range((await tqv.read_word_reg(REG_FIFO_ST) >> 8) & 0x1F):
+            for _ in range((await tqv.read_word_reg(REG_FIFO_ST) >> 8) & 0x3FFF):
                 got.append(await tqv.read_byte_reg(REG_FIFO))
             return got
 
@@ -800,22 +802,22 @@ class PioTest(PrismTest):
 
         async def fifo_a():
             got = []
-            for _ in range((await tqv.read_word_reg(REG_FIFO_ST) >> 8) & 0x1F):
+            for _ in range((await tqv.read_word_reg(REG_FIFO_ST) >> 8) & 0x3FFF):
                 got.append(await tqv.read_byte_reg(REG_FIFO))
             return got
 
-        self.log("logic analyser: nothing before the rising trigger, then 32 samples fill FIFO A")
+        self.log(f"logic analyser: nothing before the rising trigger, then {2 * FIFO_DEPTH} samples fill FIFO A")
         await self.clocks(10)
         await sample([0x2, 0x4, 0x6])                                         # channel 0 low: no trigger
         assert await bench.curr_state() == 0 and await fifo_a() == []
         await trigger(1)                                                      # rising edge on ui_in[0]
         assert await bench.curr_state() == 2                                  # LA_WAIT
-        nibbles = [(i * 7 + 3) & 0xF for i in range(32)]
+        nibbles = [(i * 7 + 3) & 0xF for i in range(2 * FIFO_DEPTH)]
         await sample(nibbles)
         st = await tqv.read_word_reg(REG_FIFO_ST)
         assert await bench.irq() and await bench.curr_state() == 0, (await bench.curr_state(), hex(st), await bench.irq())   # full: interrupt, re-armed
         await tqv.write_byte_reg(REG_INT_CLR0, 0x80)
-        assert await fifo_a() == [(nibbles[2 * i] << 4) | nibbles[2 * i + 1] for i in range(16)]
+        assert await fifo_a() == [(nibbles[2 * i] << 4) | nibbles[2 * i + 1] for i in range(FIFO_DEPTH)]
 
         self.log("logic analyser, LSB first, falling trigger")
         await tqv.write_word_reg(REG_CFG0, chroma_pio_ctrlReg | CFG_SHIFT_DIR_LSB)
@@ -924,7 +926,7 @@ class SpiMasterTest(PrismTest):
 
         async def fifo_a():
             got = []
-            for _ in range((await tqv.read_word_reg(REG_FIFO_ST) >> 8) & 0x1F):
+            for _ in range((await tqv.read_word_reg(REG_FIFO_ST) >> 8) & 0x3FFF):
                 got.append(await tqv.read_byte_reg(REG_FIFO))
             return got
 
@@ -1034,7 +1036,7 @@ class OneWireTest(PrismTest):
 
         async def fifo_a():
             got = []
-            for _ in range((await tqv.read_word_reg(REG_FIFO_ST) >> 8) & 0x1F):
+            for _ in range((await tqv.read_word_reg(REG_FIFO_ST) >> 8) & 0x3FFF):
                 got.append(await tqv.read_byte_reg(REG_FIFO))
             return got
 
@@ -1109,7 +1111,7 @@ class FifoLoopTest(PrismTest):
         await self.clocks(100)
         assert await tqv.read_word_reg(REG_FIFO_ST + SHARD1) & 0x1 == 1      # B drained ...
         st = await tqv.read_word_reg(REG_FIFO_ST)
-        assert (st >> 8) & 0x1F == len(data), f"{st:#x}"                      # ... into A
+        assert (st >> 8) & 0x3FFF == len(data), f"{st:#x}"                    # ... into A
         for b in data:
             assert await tqv.read_byte_reg(REG_FIFO) == b
         assert await tqv.read_word_reg(REG_FIFO_ST) & 0x1 == 1
@@ -1118,23 +1120,200 @@ class FifoLoopTest(PrismTest):
         # More than A can hold: the FSM stops on fifo_a_full and resumes as the
         # host drains A; the bytes arrive in order
         self.log("FIFO A full back-pressure")
-        for b in range(20):
-            await tqv.write_byte_reg(REG_FIFO + SHARD1, 0xC0 + b)
+        MORE = FIFO_DEPTH + 6
+        for b in range(MORE):
+            await tqv.write_byte_reg(REG_FIFO + SHARD1, (0xC0 + b) & 0xFF)
         await self.clocks(200)
-        assert (await tqv.read_word_reg(REG_FIFO_ST) >> 8) & 0x1F == 16
-        assert (await tqv.read_word_reg(REG_FIFO_ST + SHARD1) >> 8) & 0x1F == 4
-        for b in range(20):
+        assert (await tqv.read_word_reg(REG_FIFO_ST) >> 8) & 0x3FFF == FIFO_DEPTH
+        assert (await tqv.read_word_reg(REG_FIFO_ST + SHARD1) >> 8) & 0x3FFF == MORE - FIFO_DEPTH
+        for b in range(MORE):
             await self.clocks(20)
-            assert await tqv.read_byte_reg(REG_FIFO) == 0xC0 + b
+            assert await tqv.read_byte_reg(REG_FIFO) == (0xC0 + b) & 0xFF
         assert await tqv.read_word_reg(REG_FIFO_ST + SHARD1) & 0x1 == 1
         assert await tqv.read_word_reg(REG_FIFO_ST) & 0x1 == 1
-        assert await tqv.read_byte_reg(REG_COUNT2) == len(data) + 20
+        assert await tqv.read_byte_reg(REG_COUNT2) == (len(data) + MORE) & 0xFF
         await bench.disable()
 
 
 # =============================================================================
 # PRISM Edge Detect circuit unit test
 # =============================================================================
+class Fifo32Test(PrismTest):
+    ''' 32-bit FIFO access (CFG3[11], FIFO32 at +0x54) on the fifo_loop chroma:
+        shard 0 owns both FIFOs, B (shard 1's window) is TX and A is RX, and
+        the chroma moves every byte from B to A.  A word written to B's
+        FIFO32 is pushed a byte at a time, low byte first; A's pop machine
+        assembles four bytes into its word register, flags it (FIFO_STATUS[4]
+        and the shard 0 interrupt) and a read of A's FIFO32 takes it.  Byte
+        reads of A's FIFO while the word register holds bytes come from its
+        low byte and the machine refills behind them, so mixing never
+        reorders; short messages leave their stragglers in the FIFO where
+        byte reads find them.  The push machine stalls on a full FIFO
+        (FIFO_STATUS[5] busy) and resumes as the host drains.  Repeated with
+        A as the SRAM FIFO where the tile has one. '''
+    name = "32-bit FIFO access (FIFO32 word push / pop)"
+
+    async def run(self):
+        tqv, bench = self.tqv, self.bench
+        WORD_FULL, BUSY = FIFO_ST_WORD_FULL, FIFO_ST_PUSH_BUSY
+
+        async def st(base=0):
+            return await tqv.read_word_reg(REG_FIFO_ST + base)
+
+        async def count(base=0):
+            return ((await st(base)) >> 8) & 0x3FFF
+
+        async def wait_word(tries=60):
+            for _ in range(tries):
+                if (await st()) & WORD_FULL:
+                    return
+                await self.clocks(10)
+            raise AssertionError("no complete word in A's word register")
+
+        async def wait_idle(tries=60):
+            for _ in range(tries):
+                if not (await st(SHARD1)) & BUSY:
+                    return True
+                await self.clocks(10)
+            return False
+
+        async def push_word(w):
+            assert await wait_idle(), "push machine stuck busy"
+            await tqv.write_word_reg(REG_FIFO32 + SHARD1, w)
+
+        async def settle(base=0):
+            s0 = await st(base)
+            assert not (s0 & WORD_FULL) and FIFO_ST_WORD_BYTES(s0) == 0 and s0 & 0x1, f"{s0:#x}"
+
+        await bench.load_chroma(chroma_fifo_loop, chroma_fifo_loop_ctrlReg, chroma_fifo_loop_pinmuxReg)
+        await tqv.write_word_reg(REG_CFG0 + SHARD1, CFG_FIFO_DIR_TX)          # B: host pushes
+        await tqv.write_word_reg(REG_CFG3, CFG3_FIFO32)                        # A: word pops
+        await tqv.write_word_reg(REG_CFG3 + SHARD1, CFG3_FIFO32)               # B: word pushes
+        await settle(); await settle(SHARD1)
+        assert not await bench.irq()
+
+        self.log("one word through: pushed low byte first, assembled low byte first")
+        await push_word(0x44332211)
+        await wait_word()
+        s0 = await st()
+        assert (s0 >> 8) & 0x3FFF == 0 and s0 & 0x1, f"{s0:#x}"              # A itself drained into the word register
+        assert await bench.irq(), "no interrupt for the complete word"
+        assert await tqv.read_word_reg(REG_FIFO32) == 0x44332211
+        await settle()
+        assert not await bench.irq(), "interrupt should clear with the word read"
+        assert await tqv.read_byte_reg(REG_COUNT2) == 4                        # the chroma moved 4 bytes
+
+        self.log("a run of words keeps its order")
+        words = [0x01020304, 0xDEADBEEF, 0x00000000, 0xFFFFFFFF, 0x80000001, 0x7F00FF01]
+        for w in words:
+            await push_word(w)
+        for w in words:
+            await wait_word()
+            got = await tqv.read_word_reg(REG_FIFO32)
+            assert got == w, f"{got:#x} expected {w:#x}"
+        await settle(); await settle(SHARD1)
+
+        self.log("stragglers: the machine waits for four, byte reads take the rest")
+        await push_word(0xA4A3A2A1)
+        await tqv.write_byte_reg(REG_FIFO + SHARD1, 0xB1)
+        await tqv.write_byte_reg(REG_FIFO + SHARD1, 0xB2)
+        await wait_word()
+        assert await tqv.read_word_reg(REG_FIFO32) == 0xA4A3A2A1
+        await self.clocks(60)
+        s0 = await st()
+        assert FIFO_ST_WORD_BYTES(s0) == 0 and (s0 >> 8) & 0x3FFF == 2, f"{s0:#x}"
+        assert not await bench.irq()
+        assert await tqv.read_byte_reg(REG_FIFO) == 0xB1
+        assert await tqv.read_byte_reg(REG_FIFO) == 0xB2
+        await settle()
+
+        self.log("a byte read of a complete word: low byte out, the FIFO's next byte refills the top")
+        await push_word(0x14131211)
+        await tqv.write_byte_reg(REG_FIFO + SHARD1, 0x15)
+        await wait_word()
+        await self.clocks(40)
+        assert await count() == 1                                              # 0x15 waits in A
+        assert await tqv.read_byte_reg(REG_FIFO) == 0x11
+        await wait_word()                                                      # topped up with 0x15
+        assert await count() == 0
+        assert await tqv.read_word_reg(REG_FIFO32) == 0x15141312
+        await settle()
+
+        self.log("byte reads with nothing behind them leave a partial word; later bytes complete it")
+        await push_word(0x24232221)
+        await wait_word()
+        assert await tqv.read_byte_reg(REG_FIFO) == 0x21
+        await self.clocks(30)
+        s0 = await st()
+        assert FIFO_ST_WORD_BYTES(s0) == 3 and not (s0 & WORD_FULL), f"{s0:#x}"
+        assert not await bench.irq()
+        assert await tqv.read_byte_reg(REG_FIFO) == 0x22
+        s0 = await st()
+        assert FIFO_ST_WORD_BYTES(s0) == 2, f"{s0:#x}"
+        await tqv.write_byte_reg(REG_FIFO + SHARD1, 0x25)
+        await tqv.write_byte_reg(REG_FIFO + SHARD1, 0x26)
+        await wait_word()
+        assert await bench.irq()
+        assert await tqv.read_word_reg(REG_FIFO32) == 0x26252423
+        await settle()
+
+        self.log("back-pressure: words until the push machine stalls, then drained in order")
+        sent = []
+        for i in range(40):
+            if not await wait_idle(tries=8):
+                break                                                          # stalled on a full B: stop writing
+            w = ((i + 1) * 0x11111111) & 0xFFFFFFFF
+            await tqv.write_word_reg(REG_FIFO32 + SHARD1, w)
+            sent.append(w)
+        await self.clocks(100)
+        sA, sB = await st(), await st(SHARD1)
+        assert sA & WORD_FULL and sA & 0x2, f"A {sA:#x}"                     # word register and A full
+        assert sB & 0x2 and sB & BUSY, f"B {sB:#x}"                            # B full, a word stuck in the machine
+        assert len(sent) >= 4, len(sent)
+        for w in sent:
+            await wait_word()
+            got = await tqv.read_word_reg(REG_FIFO32)
+            assert got == w, f"{got:#x} expected {w:#x}"
+        await self.clocks(60)
+        await settle(); await settle(SHARD1)
+        assert not (await st(SHARD1)) & BUSY
+
+        self.log("mode off: the word register still drains first, then the FIFO")
+        await push_word(0x34333231)
+        await tqv.write_byte_reg(REG_FIFO + SHARD1, 0x35)
+        await wait_word()
+        await tqv.write_word_reg(REG_CFG3, 0)                                  # A: byte mode again
+        await self.clocks(20)
+        assert not await bench.irq()                                           # no word interrupt without the mode
+        for b in (0x31, 0x32, 0x33, 0x34, 0x35):
+            assert await tqv.read_byte_reg(REG_FIFO) == b
+        await settle()
+        await tqv.write_word_reg(REG_CFG3, CFG3_FIFO32)
+
+        if os.environ.get("PRISM_SRAM_FIFO", "2") != "0":
+            self.log("A as the SRAM FIFO: the machine rides out the SRAM's refetch gaps")
+            await tqv.write_word_reg(REG_CFG0, chroma_fifo_loop_ctrlReg | CFG_FIFO_SRAM)
+            await tqv.write_word_reg(REG_FIFO_ST, 0)                           # flush
+            await settle()
+            words = [0x11223344, 0x55667788, 0x99AABBCC, 0xDDEEFF00, 0x0F1E2D3C]
+            for w in words:
+                await push_word(w)
+            await tqv.write_byte_reg(REG_FIFO + SHARD1, 0xE1)
+            for w in words:
+                await wait_word()
+                got = await tqv.read_word_reg(REG_FIFO32)
+                assert got == w, f"{got:#x} expected {w:#x}"
+            await self.clocks(60)
+            assert await count() == 1
+            assert await tqv.read_byte_reg(REG_FIFO) == 0xE1
+            await settle()
+            await tqv.write_word_reg(REG_CFG0, chroma_fifo_loop_ctrlReg)
+
+        await tqv.write_word_reg(REG_CFG3, 0)
+        await tqv.write_word_reg(REG_CFG3 + SHARD1, 0)
+        await bench.disable()
+
+
 class SramFifoTest(PrismTest):
     ''' The SRAM FIFOs as a shard's storage (CFG0[31]; one 512x32 macro per
         shard, 2 KB each).  Register-level
@@ -1162,8 +1341,8 @@ class SramFifoTest(PrismTest):
         assert (await tqv.read_word_reg(REG_FIFO_ST + SHARD1) >> 8) & 0x3FFF == 40
         # the flop FIFO of shard 1 stayed empty; shard 0's too
         await tqv.write_word_reg(REG_CFG0 + SHARD1, CFG_FIFO_DIR_TX)
-        assert await tqv.read_word_reg(REG_FIFO_ST + SHARD1) & 0x1F01 == 0x0001
-        assert await tqv.read_word_reg(REG_FIFO_ST) & 0x1F01 == 0x0001
+        assert await tqv.read_word_reg(REG_FIFO_ST + SHARD1) & 0x3FFF01 == 0x000001
+        assert await tqv.read_word_reg(REG_FIFO_ST) & 0x3FFF01 == 0x000001
         await tqv.write_word_reg(REG_CFG0 + SHARD1, CFG_FIFO_DIR_TX | CFG_FIFO_SRAM)
         assert (await tqv.read_word_reg(REG_FIFO_ST + SHARD1) >> 8) & 0x3FFF == 40  # contents kept
         await tqv.write_word_reg(REG_FIFO_ST + SHARD1, 0)                     # flush
@@ -1204,7 +1383,7 @@ class SramFifoTest(PrismTest):
         await tqv.write_word_reg(REG_CFG0, 0)
 
         # SRAM (B, TX) -> flop FIFO (A, RX) through the fifo_loop chroma: the
-        # host queues more than 16 bytes, the FSM drains B as the host reads A
+        # host queues more than the flop FIFO holds, the FSM drains B as the host reads A
         self.log("fifo_loop: SRAM FIFO B -> flop FIFO A")
         await bench.load_chroma(chroma_fifo_loop, chroma_fifo_loop_ctrlReg, chroma_fifo_loop_pinmuxReg)
         await tqv.write_word_reg(REG_CFG0 + SHARD1, CFG_FIFO_DIR_TX | CFG_FIFO_SRAM)
@@ -1583,7 +1762,7 @@ class Timer2Test(PrismTest):
 
 class ConstTableTest(PrismTest):
     ''' CONST_TAB: the shard's 16x8 latch FIFO as addressable constants.
-        The host loads 16 bytes through the flop FIFO, then the const_tab
+        The host loads 16 bytes through the flop FIFO (rows 0-15), then the const_tab
         chroma performs six comm loads with the index modes clear, + 1, + 1,
         + add_to_idx, = / + idx_load, + 1 and pushes each byte into the
         SRAM FIFO for the host to read back.  Pre and post index update,
@@ -1613,7 +1792,8 @@ class ConstTableTest(PrismTest):
         await tqv.write_word_reg(REG_FIFO_ST, 0)
         for b in table:
             await tqv.write_byte_reg(REG_FIFO, b)
-        assert await tqv.read_word_reg(REG_FIFO_ST) & 0x1F03 == 0x1002          # 16 bytes, full
+        st = await tqv.read_word_reg(REG_FIFO_ST)
+        assert (st >> 8) & 0x3FFF == 16 and st & 0x3 == 0, f"{st:#x}"            # 16 bytes in rows 0-15
         await bench.load_chroma(chroma_const_tab, chroma_const_tab_ctrlReg, chroma_const_tab_pinmuxReg)
         await tqv.write_word_reg(REG_FIFO_ST, 0)                     # the SRAM FIFO (RX) takes the pushes
 
@@ -1716,7 +1896,7 @@ class UsbDeviceTest(PrismTest):
         reply = await host.receive()
         assert reply == [usb.PID_ACK], reply
         st = await tqv.read_word_reg(REG_FIFO_ST)
-        assert (st >> 8) & 0x1F == len(payload) + 2, f"{st:#x}"
+        assert (st >> 8) & 0x3FFF == len(payload) + 2, f"{st:#x}"
         got = [await tqv.read_byte_reg(REG_FIFO) for _ in range(len(payload) + 2)]
         assert got == payload + usb.crc16(payload), [hex(x) for x in got]
 

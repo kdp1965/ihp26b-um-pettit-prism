@@ -27,9 +27,12 @@
 //     +0x10  COUNTS   {comm_count, shift_count, comm, compare, count2}; byte lanes 0-2 writable
 //     +0x14  HOST     host_in[1:0]; byte +0x15 write toggles host_in[0] and clears the interrupt
 //     +0x18  FLAGS    RO datapath flags
-//     +0x1C  CFG1     [19:16] FIFO almost-empty level, [23:20] FIFO almost-full level
+//     +0x1C  CFG1     [19:16] FIFO almost-empty level, [23:20] FIFO almost-full level (4-byte units for the
+//                     64-byte flop FIFO: almost-empty when count <= 4 x level, almost-full when count >= 64 - 4 x level;
+//                     64-byte units for the SRAM FIFO)
 //     +0x20  FIFO     byte: write pushes (TX mode), read pops (RX mode)
-//     +0x24  FIFO_STATUS {count[21:8], almost_full[3], almost_empty[2], full[1], empty[0]}; any write flushes
+//     +0x24  FIFO_STATUS {count[21:8], word bytes[7:6], push busy[5], word full[4], almost_full[3],
+//                     almost_empty[2], full[1], empty[0]}; any write flushes (the word registers too)
 //     +0x28  CRC_POLY
 //     +0x2C  CRC      value; write = preset (counter mode: the count)
 //     +0x30  CRC_EXPECTED (counter mode: the compare value)
@@ -48,6 +51,7 @@
 //                     clear / load; [28] flag2 inverts the edge (rising <-> falling) so one FSM flag
 //                     switches a bidirectional protocol's sampling edge; its sticky "edge pending" is
 //                     slot code 15 too (cleared by the FSM's OUT_SHIFT or OUT_LATCH) and FLAGS[11]
+//                     [11] 32-bit FIFO access through FIFO32 (+0x54), see there
 //                     [10] counter mode (prism_crc.v, crc_mode must be 0): the 32-bit CRC register is an
 //                     up / down counter: OUT_CRC_CLEAR presets it (0, or all ones with CFG0[25]),
 //                     OUT_CRC_UPDATE + 1, OUT_LOAD_CRC - 1 (no shifter load); input 22 and FLAGS[10]
@@ -57,6 +61,15 @@
 //                     [24] restart the count on entry into state [29:25] (next SI == it, current SI != it):
 //                     a retriggerable timeout with no STEW bits; [30] one-shot: after its tick the timer
 //                     waits for the next entry instead of running on
+//     +0x54  FIFO32   32-bit FIFO access (CFG3[11]).  TX: a word write pushes its four bytes, low byte
+//                     first, one every fourth clock (FIFO_STATUS[5] busy meanwhile; a write while busy is
+//                     dropped, so poll it when the FIFO can be full).  RX: a pop machine takes four bytes
+//                     out of the FIFO as soon as it holds them, low byte first, into a word register;
+//                     FIFO_STATUS[4] (and the shard's interrupt) say the word is complete, a read of FIFO32
+//                     takes it.  A byte read of FIFO (+0x20) while the word register holds bytes is served
+//                     from its low byte, the rest shift down and the machine refills the top, so bytes
+//                     never reorder however the host mixes word and byte reads; FIFO_STATUS[7:6] counts
+//                     the bytes held when the word is not complete (stragglers of a short message).
 //     +0x50  COMM_PINS multi-bit comm shift lanes: with CFG0[2] a uo_out pin whose pinmux code is 6 shows a bit of
 //                     the 4-bit window comm[base+3:base], base = COMM_PINS[2:0] (0-4), lane = COMM_PINS[2k+5:2k+4]
 //                     (k = uo_out pin - 1) instead of the shifter's serial bit
@@ -131,7 +144,7 @@
 //          edge-capable input the flop follows (0-6 = ui_in pin, 8-9 = host_in);
 //          the flop captures its source when a decision tree reading that
 //          input fires and the jump is executed (core in_prev_cap strobe)
-//     19:16 FIFO almost-empty level   23:20 FIFO almost-full level
+//     19:16 FIFO almost-empty level   23:20 FIFO almost-full level (4-byte units, see +0x1C)
 //     25:24 / 27:26  flag select for inputs 20 / 21 (own FIFO)
 //     29:28 / 31:30  flag select for inputs 26 / 27 (FIFO B, shard 0 unfractured)
 //          each slot has a default side (E = empty, F = full): select bit 0
@@ -253,7 +266,8 @@ module tqvp_prism #( parameter SRAM_FIFO = 2, parameter SRAM_AW = 9, parameter C
     localparam [6:0] SH_TRACE_CFG  = 7'h44; // trace: configuration
     localparam [6:0] SH_TRACE_CTRL = 7'h48; //        arm / stop, status
     localparam [6:0] SH_CTAB    = 7'h4C;    // constant table: the latch FIFO as addressable constants
-    localparam [6:0] SH_COMM_PINS = 7'h50;  // multi-bit shift: comm bit per uo_out pin with pinmux code 6
+    localparam [6:0] SH_COMM_PINS = 7'h50;  // multi-bit shift: comm bit per uo_out pin
+    localparam [6:0] SH_FIFO32  = 7'h54;    // 32-bit FIFO push / pop (CFG3[11]) with pinmux code 6
     localparam       CT_EN        = 0;      // CONST_TAB bits
     localparam       CT_LOAD_ADDS = 1;      // index mode 3 adds idx_load instead of loading it
     localparam       CT_POST      = 2;      // load the row before the index moves
@@ -275,6 +289,7 @@ module tqvp_prism #( parameter SRAM_FIFO = 2, parameter SRAM_AW = 9, parameter C
     localparam       CFG3_SHIFT_MRX = 8;    //       [8] shifter input = recovered bit
     localparam       CFG3_MRX_DDR   = 9;    //       [9] double-edge sampling (hb in half clocks)
     localparam       CFG3_CNT_EN    = 10;   //       [10] CRC register = up / down counter with compare
+    localparam       CFG3_FIFO32    = 11;   //       [11] 32-bit FIFO access through FIFO32
     localparam       CFG3_SMP_EN    = 16;   // edge-clocked sampler: [16] enable
     localparam       CFG3_SMP_SRC   = 17;   //       [21:17] clock input (PRISM input 0-31)
     localparam       CFG3_SMP_EDGE  = 22;   //       [23:22] 0 rising, 1 falling, 2 either
@@ -284,8 +299,9 @@ module tqvp_prism #( parameter SRAM_FIFO = 2, parameter SRAM_AW = 9, parameter C
     localparam       CFG3_SMP_TIMER = 27;   //       [27] count1 clear / load on the edge
     localparam       CFG3_SMP_INV   = 28;   //       [28] flag2 swaps rising and falling
 
-    localparam  FIFO_DEPTH  = 64;
-    localparam  FIFO_AW     = 4;
+    localparam  FIFO_DEPTH  = 64;           // flop FIFO bytes per shard
+    localparam  FIFO_AW     = 6;            // log2(FIFO_DEPTH): sizes the pointers, the row select and the count
+    localparam  FIFO_LVL_SH = FIFO_AW - 4;  // CFG1's 4-bit levels are in 2^FIFO_LVL_SH-byte units (4 bytes here)
 
     wire                prism_enable;
     wire                prism_wr;
@@ -424,6 +440,8 @@ module tqvp_prism #( parameter SRAM_FIFO = 2, parameter SRAM_AW = 9, parameter C
             fifo_flag = (full_side ^ sel[1]) ? (sel[0] ? af : full) : (sel[0] ? ae : empty);
         end
     endfunction
+    wire [32*SHARDS-1:0] fifo32_v;      // the RX word registers
+    wire [8*SHARDS-1:0]  fifo_rd_v;     // what a byte read of FIFO returns
     wire [32*SHARDS-1:0] crc_poly_v;
     wire [32*SHARDS-1:0] crc_v;
     wire [32*SHARDS-1:0] crc_exp_v;
@@ -591,7 +609,7 @@ module tqvp_prism #( parameter SRAM_FIFO = 2, parameter SRAM_AW = 9, parameter C
                                                                 : (out_s[OUT_K_SEL0] ? consts[15:8]  : consts[7:0]);
             wire  [7:0]               comm_load_data;
             wire                      comm_match = (comm == consts[31:24]);
-            // Constant table (CONST_TAB): the latch FIFO's 16 rows as
+            // Constant table (CONST_TAB): the latch FIFO's rows 0-15 as
             // constants at a 4-bit index; {OUT_K_SEL1, OUT_K_SEL0} says how
             // the index moves on each OUT_COMM_LOAD (clear, + 1, + add_to_idx,
             // = or + idx_load) and the row loaded is the one after the move
@@ -670,11 +688,94 @@ module tqvp_prism #( parameter SRAM_FIFO = 2, parameter SRAM_AW = 9, parameter C
             wire                      pop_dir  = sel_b ? fifo_dir_b : fifo_dir;          // direction of the FIFO bit 5 strobes
             wire  [7:0]               pop_head = sel_b ? fifo_head_v[8*(SHARDS-1) +: 8] : fifo_head;
             wire  [7:0]               push_src = (s == SHARDS-1 && !fractured) ? comm_v[7:0] : comm;
+            // 32-bit FIFO access (CFG3[11], FIFO32 at +0x54): a push machine that
+            // feeds a written word into a TX FIFO a byte at a time, and a pop
+            // machine that assembles a word from an RX FIFO, see below
+            wire                      f32_en   = cfg3[CFG3_FIFO32];
+            wire                      f32_rd   = (data_read_n != 2'b11) && win && (shard_off[6:2] == SH_FIFO32[6:2]);
+            wire                      f32_wr   = prism_wr && win && shard_off == SH_FIFO32;
+            reg  [31:0]               pop_w;                    // RX word register, byte k at [8k+7:8k]
+            reg  [2:0]                pop_n;                    // bytes it holds (0-4)
+            reg  [31:0]               push_w;                   // TX word, low byte next
+            reg  [1:0]                push_n;                   // bytes of it pushed so far
+            reg                       push_busy;
+            reg  [1:0]                push_gap;                 // clocks to wait before the next push
+            wire                      word_full = (pop_n == 3'd4);
+            wire                      rx32      = f32_en & !fifo_dir;
+            // A byte read of FIFO is served from the word register while that
+            // holds anything (the machine refills behind it), from the FIFO
+            // otherwise; the machine never pops in a cycle the host reads.
+            wire                      host_pop  = fifo_rd & (pop_n == 3'd0);
+            wire                      fsm_pop   = rx32 & !word_full & !fifo_empty & !fifo_rd &
+                                                  (fifo_count >= {11'h0, 3'd4 - pop_n});
+            wire                      fsm_push  = push_busy & (push_gap == 2'd0) & !fifo_full & !fifo_wr;
+            assign fifo_rd_v[8*s +: 8]   = (pop_n != 3'd0) ? pop_w[7:0] : fifo_head;
+            assign fifo32_v[32*s +: 32]  = pop_w;
             // FIFO requests: RX (fifo_dir = 0) FSM pushes comm / host pops by reading,
             //                TX (fifo_dir = 1) host pushes by writing / FSM pops into comm
-            wire                      f_push  = fifo_dir ? fifo_wr : fifo_op;
-            wire  [7:0]               f_pdata = fifo_dir ? data_in[7:0] : push_src;
-            wire                      f_pop   = fifo_dir ? fifo_op : fifo_rd;
+            wire                      f_push  = fifo_dir ? (fifo_wr | fsm_push) : fifo_op;
+            wire  [7:0]               f_pdata = fifo_dir ? (fifo_wr ? data_in[7:0] : push_w[7:0]) : push_src;
+            wire                      f_pop   = fifo_dir ? fifo_op : (host_pop | fsm_pop);
+
+            always @(posedge clk or negedge rst_n)
+            begin
+                if (!rst_n)
+                begin
+                    pop_w     <= 32'h0;
+                    pop_n     <= 3'd0;
+                    push_w    <= 32'h0;
+                    push_n    <= 2'd0;
+                    push_busy <= 1'b0;
+                    push_gap  <= 2'd0;
+                end
+                else if (fifo_flush)
+                begin
+                    pop_n     <= 3'd0;
+                    push_busy <= 1'b0;
+                end
+                else
+                begin
+                    // RX word register: a byte read shifts it down, a word read
+                    // of a complete word empties it, the machine fills slot pop_n
+                    if (fifo_rd && pop_n != 3'd0)
+                    begin
+                        pop_w <= {8'h00, pop_w[31:8]};
+                        pop_n <= pop_n - 3'd1;
+                    end
+                    else if (f32_rd && word_full)
+                        pop_n <= 3'd0;
+                    else if (fsm_pop)
+                    begin
+                        case (pop_n[1:0])
+                            2'd0: pop_w[7:0]   <= fifo_head;
+                            2'd1: pop_w[15:8]  <= fifo_head;
+                            2'd2: pop_w[23:16] <= fifo_head;
+                            2'd3: pop_w[31:24] <= fifo_head;
+                        endcase
+                        pop_n <= pop_n + 3'd1;
+                    end
+
+                    // TX push machine: one byte every fourth clock, waiting on a
+                    // full FIFO; a word write is taken only while idle
+                    if (f32_wr && f32_en && fifo_dir && !push_busy)
+                    begin
+                        push_w    <= data_in;
+                        push_n    <= 2'd0;
+                        push_gap  <= 2'd0;
+                        push_busy <= 1'b1;
+                    end
+                    else if (fsm_push)
+                    begin
+                        push_w   <= {8'h00, push_w[31:8]};
+                        push_n   <= push_n + 2'd1;
+                        push_gap <= 2'd3;
+                        if (push_n == 2'd3)
+                            push_busy <= 1'b0;
+                    end
+                    else if (push_gap != 2'd0)
+                        push_gap <= push_gap - 2'd1;
+                end
+            end
 
             // halt_s covers the debugger halt and the cycle a conditional
             // breakpoint fires, so that cycle's outputs never reach the datapath
@@ -741,9 +842,9 @@ module tqvp_prism #( parameter SRAM_FIFO = 2, parameter SRAM_AW = 9, parameter C
                 .push_data    ( f_pdata                          ),
                 .pop          ( f_pop & !fifo_sram               ),
                 .tab_en       ( ctab[CT_EN]                      ),
-                .tab_idx      ( tab_idx                          ),
-                .ae_level     ( cfg1[16 +: FIFO_AW]              ),
-                .af_level     ( cfg1[20 +: FIFO_AW]              ),
+                .tab_idx      ( {{(FIFO_AW-4){1'b0}}, tab_idx}   ),    // the table is rows 0-15
+                .ae_level     ( {cfg1[16 +: 4], {FIFO_LVL_SH{1'b0}}} ),   // levels in 4-byte units
+                .af_level     ( {cfg1[20 +: 4], {FIFO_LVL_SH{1'b0}}} ),
                 .head         ( lf_head                          ),
                 .count        ( lf_count                         ),
                 .empty        ( lf_empty                         ),
@@ -1308,7 +1409,8 @@ module tqvp_prism #( parameter SRAM_FIFO = 2, parameter SRAM_AW = 9, parameter C
             assign const_v   [32*s +: 32] = consts;
             assign ctab_v    [32*s +: 32] = {12'h0, const_idx, 5'h0, ctab};
             assign comm_pins_v[32*s +: 32] = {14'h0, comm_pins};
-            assign fifo_st_v [32*s +: 32] = {10'h0, fifo_count, 4'h0, fifo_af, fifo_ae, fifo_full, fifo_empty};
+            assign fifo_st_v [32*s +: 32] = {10'h0, fifo_count, pop_n[1:0], push_busy, word_full,
+                                             fifo_af, fifo_ae, fifo_full, fifo_empty};
             assign fifo_head_v[8*s +: 8]  = fifo_head;
             assign comm_v     [8*s +: 8]  = comm;
             if (s == 0)
@@ -1319,7 +1421,7 @@ module tqvp_prism #( parameter SRAM_FIFO = 2, parameter SRAM_AW = 9, parameter C
             assign crc_v     [32*s +: 32] = crc_value;
             assign crc_exp_v [32*s +: 32] = crc_exp;
             assign host_in_v[2*s +: 2]   = host_in;
-            assign irq_v[s]              = irq;
+            assign irq_v[s]              = irq | (rx32 & word_full);    // 32-bit RX: a complete word is an interrupt
             assign sema_v[s]             = sema;
             assign halt_r_v[s]           = halt_r;
 
@@ -1548,7 +1650,7 @@ module tqvp_prism #( parameter SRAM_FIFO = 2, parameter SRAM_AW = 9, parameter C
                 SH_HOST:    reg_word = {30'h0, host_in_v[2*shard_sel +: 2]};
                 SH_FLAGS:   reg_word = flags_v  [32*shard_sel +: 32];
                 SH_CFG1:    reg_word = cfg1_v   [32*shard_sel +: 32];
-                SH_FIFO:    reg_word = {24'h0, fifo_head_v[8*shard_sel +: 8]};
+                SH_FIFO:    reg_word = {24'h0, fifo_rd_v[8*shard_sel +: 8]};
                 SH_FIFO_ST: reg_word = fifo_st_v[32*shard_sel +: 32];
                 SH_CRC_POLY:reg_word = crc_poly_v[32*shard_sel +: 32];
                 SH_CRC:     reg_word = crc_v    [32*shard_sel +: 32];
@@ -1560,6 +1662,7 @@ module tqvp_prism #( parameter SRAM_FIFO = 2, parameter SRAM_AW = 9, parameter C
                 SH_TRACE_CTRL: reg_word = trace_st_v  [32*shard_sel +: 32];
                 SH_CTAB:    reg_word = ctab_v   [32*shard_sel +: 32];
                 SH_COMM_PINS: reg_word = comm_pins_v[32*shard_sel +: 32];
+                SH_FIFO32:  reg_word = fifo32_v[32*shard_sel +: 32];
                 default:    reg_word = 32'h0;
             endcase
         end
