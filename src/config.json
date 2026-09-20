@@ -1,11 +1,12 @@
 {
+  "//steps": "Where the plugin's steps run is decided here, not in librelane_plugin_prism_pdn.py: the classes only register an id, and a Classic flow runs its step list in order. A '+' key inserts after the named step ('-' before, no prefix replaces, null deletes). The anchors carry the intent. MouthKeepouts after Odb.ManualMacroPlacement: the macros are placed, global placement has not run, so the keep-outs are in place before any cell lands. ExtendPowerStripes after OpenROAD.GeneratePDN: the tile stripes exist and can be rewritten onto the macro columns. DiodesOnSramPins after OpenROAD.ResizerTimingPostCTS: before the first global route, so one routing pass covers the diodes. DropKeepouts after Checker.TrDRC: detailed routing is done and signed off, so placement and routing are settled, and it is still before OpenROAD.FillInsertion, which is what lets the filler put decap in the freed rows (fill and decap carry no signal pins, so they cannot take back the Metal2 tracks the keep-outs protected).",
   "meta": {
     "flow": "Classic",
     "substituting_steps": {
       "+Odb.ManualMacroPlacement": "Project.MouthKeepouts",
       "+OpenROAD.GeneratePDN": "Project.ExtendPowerStripes",
       "+OpenROAD.ResizerTimingPostCTS": "Project.DiodesOnSramPins",
-    "+Checker.TrDRC": "Project.DropKeepouts"
+      "+Checker.TrDRC": "Project.DropKeepouts"
     }
   },
   "PL_TARGET_DENSITY_PCT": 52,
