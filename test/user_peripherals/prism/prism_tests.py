@@ -1793,7 +1793,7 @@ class ConstTableTest(PrismTest):
         for b in table:
             await tqv.write_byte_reg(REG_FIFO, b)
         st = await tqv.read_word_reg(REG_FIFO_ST)
-        assert (st >> 8) & 0x3FFF == 16 and st & 0x3 == 0, f"{st:#x}"            # 16 bytes in rows 0-15
+        assert (st >> 8) & 0x3FFF == 16 and not (st & 0x1) and bool(st & 0x2) == (FIFO_DEPTH == 16), f"{st:#x}"   # 16 bytes in rows 0-15
         await bench.load_chroma(chroma_const_tab, chroma_const_tab_ctrlReg, chroma_const_tab_pinmuxReg)
         await tqv.write_word_reg(REG_FIFO_ST, 0)                     # the SRAM FIFO (RX) takes the pushes
 

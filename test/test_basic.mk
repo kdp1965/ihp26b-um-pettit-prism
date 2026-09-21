@@ -15,6 +15,9 @@ PROJECT_SOURCES = project.v peri*.v tinyQV/cpu/*.v tinyQV/peri/uart/uart_tx.v us
 PRISM_SRAM_AW ?= 9
 PRISM_SRAM_FIFO ?= 2
 export PRISM_SRAM_FIFO
+# Flop FIFO depth, log2 bytes (6 = 64, 5 = 32, 4 = 16); the tests scale to it
+PRISM_FIFO_AW ?= 4
+export PRISM_FIFO_AW
 
 # The PDK's behavioural SRAM models, vendored so the GitHub test jobs
 # (which have no PDK checkout) can simulate the macro at RTL and at gate
@@ -37,7 +40,7 @@ COMPILE_ARGS 		+= -DSIM
 # in ihp_sram/ so the GitHub test job (no PDK checkout) can simulate it
 VERILOG_SOURCES += $(SRAM_MODELS)
 COMPILE_ARGS 		+= -DFUNCTIONAL
-COMPILE_ARGS 		+= -DPRISM_SRAM_AW=$(PRISM_SRAM_AW) -DPRISM_SRAM_FIFO=$(PRISM_SRAM_FIFO)
+COMPILE_ARGS 		+= -DPRISM_SRAM_AW=$(PRISM_SRAM_AW) -DPRISM_SRAM_FIFO=$(PRISM_SRAM_FIFO) -DPRISM_FIFO_AW=$(PRISM_FIFO_AW)
 COMPILE_ARGS 		+= -DPURE_RTL
 COMPILE_ARGS 		+= -I$(SRC_DIR)
 COMPILE_ARGS 		+= -I$(addprefix $(SRC_DIR)/,user_peripherals/pwl_synth)

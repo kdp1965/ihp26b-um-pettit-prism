@@ -1,6 +1,8 @@
 # Register map and small helpers shared by the PRISM unit tests
 # (docs/prism_interface.md is the reference).
 
+import os
+
 PERIPHERAL_NUM        = 8
 CFGMEM_PERIPHERAL_NUM = 4
 
@@ -50,7 +52,7 @@ REG_FLAGS   = 0x118
 REG_CFG1    = 0x11C       # [15:0] in_prev sources, [19:16] / [23:20] FIFO almost-empty / almost-full levels
                           # (4-byte units: ae when count <= 4*lvl, af when count >= 64 - 4*lvl; 64-byte units
                           # for the SRAM FIFO), [31:24] FIFO flag selects
-FIFO_DEPTH  = 64          # bytes in a shard's flop FIFO
+FIFO_DEPTH  = 1 << int(os.environ.get("PRISM_FIFO_AW", "6"))   # bytes in a shard's flop FIFO (the build's PRISM_FIFO_AW)
 REG_FIFO    = 0x120       # byte: write pushes (TX mode), read pops (RX mode)
 REG_FIFO_ST = 0x124       # {count[21:8], word bytes[7:6], push busy[5], word full[4], af[3], ae[2], full[1], empty[0]}; write flushes
 FIFO_ST_WORD_FULL = 1 << 4  # 32-bit mode: the RX word register holds a complete word (also the shard's interrupt)

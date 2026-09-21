@@ -299,9 +299,14 @@ module tqvp_prism #( parameter SRAM_FIFO = 2, parameter SRAM_AW = 9, parameter C
     localparam       CFG3_SMP_TIMER = 27;   //       [27] count1 clear / load on the edge
     localparam       CFG3_SMP_INV   = 28;   //       [28] flag2 swaps rising and falling
 
-    localparam  FIFO_DEPTH  = 64;           // flop FIFO bytes per shard
-    localparam  FIFO_AW     = 6;            // log2(FIFO_DEPTH): sizes the pointers, the row select and the count
-    localparam  FIFO_LVL_SH = FIFO_AW - 4;  // CFG1's 4-bit levels are in 2^FIFO_LVL_SH-byte units (4 bytes here)
+    // Flop FIFO depth per shard: PRISM_FIFO_AW = log2(bytes), 6 = 64 bytes (5 = 32, 4 = 16),
+    // from the build (VERILOG_DEFINES) so a tile can trade depth for area.
+`ifndef PRISM_FIFO_AW
+`define PRISM_FIFO_AW 6
+`endif
+    localparam  FIFO_AW     = `PRISM_FIFO_AW; // sizes the pointers, the row select and the count
+    localparam  FIFO_DEPTH  = 1 << FIFO_AW;   // flop FIFO bytes per shard
+    localparam  FIFO_LVL_SH = FIFO_AW - 4;    // CFG1's 4-bit levels are in 2^FIFO_LVL_SH-byte units (4 bytes at 64)
 
     wire                prism_enable;
     wire                prism_wr;
@@ -666,6 +671,10 @@ module tqvp_prism #( parameter SRAM_FIFO = 2, parameter SRAM_AW = 9, parameter C
             assign fifo_traced = (SRAM_FIFO != 0) && trc_held_v[SI];
             wire  [7:0]               lf_head;
             wire  [FIFO_AW:0]         lf_count;
+            // widened by assignment, so a 16-byte build (FIFO_AW = 4) needs no zero-width replication
+            wire  [FIFO_AW-1:0]       lf_tab_idx  = tab_idx;
+            wire  [FIFO_AW-1:0]       lf_ae_level = cfg1[16 +: 4] << FIFO_LVL_SH;
+            wire  [FIFO_AW-1:0]       lf_af_level = cfg1[20 +: 4] << FIFO_LVL_SH;
             wire                      lf_empty, lf_full, lf_ae, lf_af;
             assign comm_load_data = ctab[CT_EN]           ? lf_head :          // the constant table's row
                                     cfg0[CFG_COMM_LOAD_K] ? k_sel   : preload[7:0];
@@ -842,9 +851,9 @@ module tqvp_prism #( parameter SRAM_FIFO = 2, parameter SRAM_AW = 9, parameter C
                 .push_data    ( f_pdata                          ),
                 .pop          ( f_pop & !fifo_sram               ),
                 .tab_en       ( ctab[CT_EN]                      ),
-                .tab_idx      ( {{(FIFO_AW-4){1'b0}}, tab_idx}   ),    // the table is rows 0-15
-                .ae_level     ( {cfg1[16 +: 4], {FIFO_LVL_SH{1'b0}}} ),   // levels in 4-byte units
-                .af_level     ( {cfg1[20 +: 4], {FIFO_LVL_SH{1'b0}}} ),
+                .tab_idx      ( lf_tab_idx                       ),    // the table is rows 0-15
+                .ae_level     ( lf_ae_level                      ),    // levels in 2^FIFO_LVL_SH-byte units
+                .af_level     ( lf_af_level                      ),
                 .head         ( lf_head                          ),
                 .count        ( lf_count                         ),
                 .empty        ( lf_empty                         ),
