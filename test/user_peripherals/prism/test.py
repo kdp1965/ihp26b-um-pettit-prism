@@ -11,6 +11,8 @@ import cocotb
 # The tiles without SRAM FIFOs (PRISM_SRAM_FIFO=0) cannot run the tests that
 # stream from them, trace into them or read the constant table through them.
 NO_SRAM = os.environ.get("PRISM_SRAM_FIFO", "2") == "0"
+# One shared SRAM (PRISM_SRAM_FIFO=1): the tests that need a FIFO or a trace buffer per shard cannot run.
+ONE_SRAM = os.environ.get("PRISM_SRAM_FIFO", "2") == "1"
 # A gate-level netlist has no design hierarchy: the tests that probe internal
 # signals (SamplerTest, Timer2Test, TraceMonitor) cannot run on it.
 GATE_LEVEL = os.environ.get("GATES") == "yes"
@@ -65,7 +67,7 @@ async def test_fifo_loop(dut):
 async def test_fifo32(dut):
     await run(dut, Fifo32Test)
 
-@cocotb.test(skip=NO_SRAM)
+@cocotb.test(skip=NO_SRAM or ONE_SRAM)
 async def test_sram_fifo(dut):
     await run(dut, SramFifoTest)
 
@@ -85,7 +87,7 @@ async def test_ethernet_tx(dut):
 async def test_ethernet_rx(dut):
     await run(dut, EthernetRxTest)
 
-@cocotb.test(skip=NO_SRAM)
+@cocotb.test(skip=NO_SRAM or ONE_SRAM)
 async def test_ethernet_loop(dut):
     await run(dut, EthernetLoopTest)
 
@@ -93,7 +95,7 @@ async def test_ethernet_loop(dut):
 async def test_fractured(dut):
     await run(dut, FracturedTest)
 
-@cocotb.test(skip=NO_SRAM or GATE_LEVEL)
+@cocotb.test(skip=NO_SRAM or ONE_SRAM or GATE_LEVEL)
 async def test_trace(dut):
     await run(dut, TraceTest)
 

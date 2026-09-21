@@ -9,7 +9,7 @@
       "+Checker.TrDRC": "Project.DropKeepouts"
     }
   },
-  "PL_TARGET_DENSITY_PCT": 80,
+  "PL_TARGET_DENSITY_PCT": 72,
   "//6x4": "6x4 experiment (2026-09-21): the 8x4 floorplan squeezed to 1289.28 um wide. Both SRAMs stay at the left edge; the left CFGMEM column moves one stripe pitch in (x 508.19, an 88 um corridor for the SRAM escapes), the right column sits flush right at 955.20 like the 5x4 tile's, leaving 116 um between the columns. Standard cells need about 85% of the area the macros leave, so the placer target is 88; keep-outs only at the upper channel mouths.",
   "//pdn": "Tiny Tapeout sg13g2 tile PDN: single layer (TopMetal1 vertical stripes, pitch 38.87 as in the ttihp-verilog-template config); pdn_cfg.tcl is LibreLane's without the per-macro grid (PDN-0233 with one layer), ERROR_ON_PDN_VIOLATIONS off because pdngen's check runs before the stripe step bridges the macro pins - LVS is the verdict",
   "FP_PDN_MULTILAYER": 0,
@@ -24,11 +24,8 @@
   "//srams": "Two 512x32 SRAM FIFOs (one per shard, 2 KB each) flush left with their pin faces toward each other; the 99.7 um gap holds both wrappers. Their power columns are Metal4 (2.81 um wide, VDD/VSS alternating every 5.62 um), so the TopMetal1 tile stripes crossing them are moved onto columns and tied down with Via4 + TopVia1 stacks by odb_stripes.py. Magic extracts the SRAM from its LEF abstract (Metal4 OBS keep-out bar at the VDD!/VDDARRAY! break), so the illegal-overlap check is waived as on CMOS5L; KLayout DRC and LVS are the verdict.",
   "ROUTING_OBSTRUCTIONS": [
     "Metal2 3.36 3.78 420.0 192.5",
-    "Metal2 3.36 342.8 420.0 531.54",
     "Metal3 3.36 3.78 420.0 192.5",
-    "Metal3 3.36 342.8 420.0 531.54",
-    "Metal4 3.36 3.78 420.0 192.5",
-    "Metal4 3.36 342.8 420.0 531.54"
+    "Metal4 3.36 3.78 420.0 192.5"
   ],
   "ERROR_ON_ILLEGAL_OVERLAPS": 0,
   "CLOCK_PERIOD": 14,
@@ -197,13 +194,6 @@
             3.78
           ],
           "orientation": "FS"
-        },
-        "i_peripherals.i_prism.SRAM[1].M512.i_sram": {
-          "location": [
-            3.36,
-            340.2
-          ],
-          "orientation": "N"
         }
       },
       "gds": [
@@ -240,9 +230,7 @@
     "i_peripherals\\.CFGMEMS\\\\?\\[3\\\\?\\]\\.cfgmem_lo VPWR VGND VPWR VGND",
     "i_peripherals\\.CFGMEMS\\\\?\\[3\\\\?\\]\\.cfgmem_hi VPWR VGND VPWR VGND",
     "i_peripherals\\.i_prism\\.SRAM\\\\?\\[0\\\\?\\]\\.M512\\.i_sram VPWR VGND VDD! VSS!",
-    "i_peripherals\\.i_prism\\.SRAM\\\\?\\[0\\\\?\\]\\.M512\\.i_sram VPWR VGND VDDARRAY! VSS!",
-    "i_peripherals\\.i_prism\\.SRAM\\\\?\\[1\\\\?\\]\\.M512\\.i_sram VPWR VGND VDD! VSS!",
-    "i_peripherals\\.i_prism\\.SRAM\\\\?\\[1\\\\?\\]\\.M512\\.i_sram VPWR VGND VDDARRAY! VSS!"
+    "i_peripherals\\.i_prism\\.SRAM\\\\?\\[0\\\\?\\]\\.M512\\.i_sram VPWR VGND VDDARRAY! VSS!"
   ],
   "MAX_TRANSITION_CONSTRAINT": 0.75,
   "MAX_FANOUT_CONSTRAINT": 8,
@@ -252,9 +240,9 @@
   ],
   "VERILOG_DEFINES": [
     "PRISM_SRAM_AW=9",
-    "PRISM_SRAM_FIFO=2",
     "IHP_SG13G2",
-    "PRISM_FIFO_AW=4"
+    "PRISM_FIFO_AW=4",
+    "PRISM_SRAM_FIFO=1"
   ],
   "RUN_MAGIC_DRC": 0,
   "//sram_gds": "The SRAM GDS is a local copy of the PDK's with its PR boundary moved from layer 235/4 (older IHP release, unknown to Magic's tech and to the Tiny Tapeout layer whitelist) to 189/4, as in the CMOS5L PDK copy of the same macro",
@@ -292,5 +280,6 @@
     "sg13g2_xnor*",
     "sg13g2_xor*"
   ],
-  "//fifo16": "16-byte flop FIFOs (PRISM_FIFO_AW=4) with the 32-bit access kept and both SRAMs: the 64-byte rows were about 43k um2 of the 435k, so the standard cells need about 77% of what the macros leave; placer target 80."
+  "//fifo16": "16-byte flop FIFOs (PRISM_FIFO_AW=4) with the 32-bit access kept and both SRAMs: the 64-byte rows were about 43k um2 of the 435k, so the standard cells need about 77% of what the macros leave; placer target 80.",
+  "//one_sram_fifo16": "One SRAM and 16-byte FIFOs together: the standard cells need about 67% of what the macros leave, the density the 5x4 tile routes at; placer target 72."
 }
