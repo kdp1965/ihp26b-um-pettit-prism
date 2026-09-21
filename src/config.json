@@ -76,28 +76,28 @@
       "instances": {
         "i_peripherals.CFGMEMS_LEFT[0].cfgmem_lo": {
           "location": [
-            508.19,
+            469.32,
             3.78
           ],
           "orientation": "FS"
         },
         "i_peripherals.CFGMEMS_LEFT[0].cfgmem_hi": {
           "location": [
-            508.19,
+            469.32,
             257.04
           ],
           "orientation": "N"
         },
         "i_peripherals.CFGMEMS_LEFT[1].cfgmem_lo": {
           "location": [
-            508.19,
+            469.32,
             366.66
           ],
           "orientation": "FS"
         },
         "i_peripherals.CFGMEMS_LEFT[1].cfgmem_hi": {
           "location": [
-            508.19,
+            469.32,
             619.92
           ],
           "orientation": "N"
@@ -133,28 +133,28 @@
       "instances": {
         "i_peripherals.CFGMEMS[2].cfgmem_lo": {
           "location": [
-            955.2,
+            932.11,
             3.78
           ],
           "orientation": "FS"
         },
         "i_peripherals.CFGMEMS[2].cfgmem_hi": {
           "location": [
-            955.2,
+            932.11,
             257.04
           ],
           "orientation": "N"
         },
         "i_peripherals.CFGMEMS[3].cfgmem_lo": {
           "location": [
-            955.2,
+            932.11,
             366.66
           ],
           "orientation": "FS"
         },
         "i_peripherals.CFGMEMS[3].cfgmem_hi": {
           "location": [
-            955.2,
+            932.11,
             619.92
           ],
           "orientation": "N"
@@ -281,5 +281,6 @@
     "sg13g2_xor*"
   ],
   "//fifo16": "16-byte flop FIFOs (PRISM_FIFO_AW=4) with the 32-bit access kept and both SRAMs: the 64-byte rows were about 43k um2 of the 435k, so the standard cells need about 77% of what the macros leave; placer target 80.",
-  "//one_sram_fifo16": "One SRAM and 16-byte FIFOs together: the standard cells need about 67% of what the macros leave, the density the 5x4 tile routes at; placer target 72."
+  "//one_sram_fifo16": "One SRAM and 16-byte FIFOs together: the standard cells need about 67% of what the macros leave, the density the 5x4 tile routes at; placer target 72.",
+  "//columns": "CFGMEM column x must keep the phase of the tile stripe grid: the macros' VPWR / VGND pin columns are 38.87 um apart like the TopMetal1 stripes, and the stripe step ties a column down only where a tile stripe crosses a pin column (it moves stripes for the SRAM, not for CFGMEM). Legal positions are 547.06 + k x 38.87 for CFGMEM_IHP_LEFT16 and 1359.68 + k x 38.87 for CFGMEM_IHP16 (the 8x4 and 5x4 positions). 955.20 was 15.78 um off and left every right-column stripe floating (PSM-0069 on VPWR at the IR-drop check). Here: left 469.32 (k = -2, a 49 um corridor beside the SRAM, whose pins face up, not east), right 932.11 (k = -11, 26 um to the die edge), 132 um between the columns."
 }
