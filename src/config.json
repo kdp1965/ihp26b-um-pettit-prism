@@ -9,8 +9,7 @@
       "+Checker.TrDRC": "Project.DropKeepouts"
     }
   },
-  "PL_TARGET_DENSITY_PCT": 88,
-  "//6x4": "6x4 experiment (2026-09-21): the 8x4 floorplan squeezed to 1289.28 um wide. Both SRAMs stay at the left edge; the left CFGMEM column moves one stripe pitch in (x 508.19, an 88 um corridor for the SRAM escapes), the right column sits flush right at 955.20 like the 5x4 tile's, leaving 116 um between the columns. Standard cells need about 85% of the area the macros leave, so the placer target is 88; keep-outs only at the upper channel mouths.",
+  "PL_TARGET_DENSITY_PCT": 55,
   "//pdn": "Tiny Tapeout sg13g2 tile PDN: single layer (TopMetal1 vertical stripes, pitch 38.87 as in the ttihp-verilog-template config); pdn_cfg.tcl is LibreLane's without the per-macro grid (PDN-0233 with one layer), ERROR_ON_PDN_VIOLATIONS off because pdngen's check runs before the stripe step bridges the macro pins - LVS is the verdict",
   "FP_PDN_MULTILAYER": 0,
   "FP_PDN_VPITCH": 38.87,
@@ -68,7 +67,6 @@
   "MOUTH_KEEPOUT_MARGIN": 20,
   "MOUTH_KEEPOUT_MAX_DENSITY": 0.25,
   "MOUTH_KEEPOUT_INWARD": 0,
-  "MOUTH_KEEPOUT_GAPS": "2",
   "MAGIC_DEF_LABELS": 0,
   "MAGIC_WRITE_LEF_PINONLY": 1,
   "FP_MACRO_HORIZONTAL_HALO": 2.0,
@@ -81,19 +79,19 @@
     "CFGMEM_IHP_LEFT16": {
       "instances": {
         "i_peripherals.CFGMEMS_LEFT[0].cfgmem_lo": {
-          "location": [508.19, 3.78],
+          "location": [547.06, 3.78],
           "orientation": "FS"
         },
         "i_peripherals.CFGMEMS_LEFT[0].cfgmem_hi": {
-          "location": [508.19, 257.04],
+          "location": [547.06, 257.04],
           "orientation": "N"
         },
         "i_peripherals.CFGMEMS_LEFT[1].cfgmem_lo": {
-          "location": [508.19, 366.66],
+          "location": [547.06, 366.66],
           "orientation": "FS"
         },
         "i_peripherals.CFGMEMS_LEFT[1].cfgmem_hi": {
-          "location": [508.19, 619.92],
+          "location": [547.06, 619.92],
           "orientation": "N"
         }
       },
@@ -112,19 +110,19 @@
     "CFGMEM_IHP16": {
       "instances": {
         "i_peripherals.CFGMEMS[2].cfgmem_lo": {
-          "location": [955.20, 3.78],
+          "location": [1359.68, 3.78],
           "orientation": "FS"
         },
         "i_peripherals.CFGMEMS[2].cfgmem_hi": {
-          "location": [955.20, 257.04],
+          "location": [1359.68, 257.04],
           "orientation": "N"
         },
         "i_peripherals.CFGMEMS[3].cfgmem_lo": {
-          "location": [955.20, 366.66],
+          "location": [1359.68, 366.66],
           "orientation": "FS"
         },
         "i_peripherals.CFGMEMS[3].cfgmem_hi": {
-          "location": [955.20, 619.92],
+          "location": [1359.68, 619.92],
           "orientation": "N"
         }
       },
