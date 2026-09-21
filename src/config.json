@@ -9,7 +9,7 @@
       "+Checker.TrDRC": "Project.DropKeepouts"
     }
   },
-  "PL_TARGET_DENSITY_PCT": 88,
+  "PL_TARGET_DENSITY_PCT": 78,
   "//6x4": "6x4 experiment (2026-09-21): the 8x4 floorplan squeezed to 1289.28 um wide. Both SRAMs stay at the left edge; the left CFGMEM column moves one stripe pitch in (x 508.19, an 88 um corridor for the SRAM escapes), the right column sits flush right at 955.20 like the 5x4 tile's, leaving 116 um between the columns. Standard cells need about 85% of the area the macros leave, so the placer target is 88; keep-outs only at the upper channel mouths.",
   "//pdn": "Tiny Tapeout sg13g2 tile PDN: single layer (TopMetal1 vertical stripes, pitch 38.87 as in the ttihp-verilog-template config); pdn_cfg.tcl is LibreLane's without the per-macro grid (PDN-0233 with one layer), ERROR_ON_PDN_VIOLATIONS off because pdngen's check runs before the stripe step bridges the macro pins - LVS is the verdict",
   "FP_PDN_MULTILAYER": 0,
@@ -24,11 +24,8 @@
   "//srams": "Two 512x32 SRAM FIFOs (one per shard, 2 KB each) flush left with their pin faces toward each other; the 99.7 um gap holds both wrappers. Their power columns are Metal4 (2.81 um wide, VDD/VSS alternating every 5.62 um), so the TopMetal1 tile stripes crossing them are moved onto columns and tied down with Via4 + TopVia1 stacks by odb_stripes.py. Magic extracts the SRAM from its LEF abstract (Metal4 OBS keep-out bar at the VDD!/VDDARRAY! break), so the illegal-overlap check is waived as on CMOS5L; KLayout DRC and LVS are the verdict.",
   "ROUTING_OBSTRUCTIONS": [
     "Metal2 3.36 3.78 420.0 192.5",
-    "Metal2 3.36 342.8 420.0 531.54",
     "Metal3 3.36 3.78 420.0 192.5",
-    "Metal3 3.36 342.8 420.0 531.54",
-    "Metal4 3.36 3.78 420.0 192.5",
-    "Metal4 3.36 342.8 420.0 531.54"
+    "Metal4 3.36 3.78 420.0 192.5"
   ],
   "ERROR_ON_ILLEGAL_OVERLAPS": 0,
   "CLOCK_PERIOD": 14,
@@ -41,11 +38,10 @@
   "FALLBACK_SDC_FILE": "src/base.sdc",
   "DESIGN_REPAIR_MAX_SLEW_PCT": 25,
   "DESIGN_REPAIR_REMOVE_BUFFERS": 1,
-  "//": "Heuristic diodes off since run 20 (they were a third of all cells and crowded the CFGMEM pin corners); the rule-based repair in the routing loop stays on",
+  "//": "DPL_CELL_PADDING 2 pads only the antenna diodes: every other cell class is excluded (padding all cells made the left-column pin-row strip worse in run 21, 633 -> 1000+ violations in its hottest bin)",
   "RUN_HEURISTIC_DIODE_INSERTION": 0,
   "RUN_ANTENNA_REPAIR": 1,
   "HEURISTIC_ANTENNA_THRESHOLD": 200,
-  "//": "Post-route antenna repair rounds: the default 3 left two Metal3 nets over ratio 200 on run koA (see docs 4z.7)",
   "DRT_ANTENNA_REPAIR_ITERS": 6,
   "CLOCK_PORT": "clk",
   "RUN_KLAYOUT_XOR": 0,
@@ -58,12 +54,10 @@
   "RIGHT_MARGIN_MULT": 6,
   "FP_SIZING": "absolute",
   "GRT_ALLOW_CONGESTION": 1,
-  "//": "A DRC report every 4 detailed-routing iterations, so tools/drt_status.py can show where a stalled route is stuck (and make harden-stop can end it)",
   "DRT_SAVE_DRC_REPORT_ITERS": 4,
   "FP_IO_HLENGTH": 2,
   "FP_IO_VLENGTH": 2,
   "RUN_CTS": 1,
-  "//": "Placement keep-outs (soft, density cap) in the rows outside each CFGMEM column's tile-facing edge at the pair gaps: every stalled route died there (see docs 4z.6)",
   "MOUTH_KEEPOUT_WIDTH": 30,
   "MOUTH_KEEPOUT_MARGIN": 20,
   "MOUTH_KEEPOUT_MAX_DENSITY": 0.25,
@@ -81,81 +75,138 @@
     "CFGMEM_IHP_LEFT16": {
       "instances": {
         "i_peripherals.CFGMEMS_LEFT[0].cfgmem_lo": {
-          "location": [508.19, 3.78],
+          "location": [
+            508.19,
+            3.78
+          ],
           "orientation": "FS"
         },
         "i_peripherals.CFGMEMS_LEFT[0].cfgmem_hi": {
-          "location": [508.19, 257.04],
+          "location": [
+            508.19,
+            257.04
+          ],
           "orientation": "N"
         },
         "i_peripherals.CFGMEMS_LEFT[1].cfgmem_lo": {
-          "location": [508.19, 366.66],
+          "location": [
+            508.19,
+            366.66
+          ],
           "orientation": "FS"
         },
         "i_peripherals.CFGMEMS_LEFT[1].cfgmem_hi": {
-          "location": [508.19, 619.92],
+          "location": [
+            508.19,
+            619.92
+          ],
           "orientation": "N"
         }
       },
-      "gds": ["macros/CFGMEM_IHP_LEFT16/CFGMEM_IHP_LEFT16.gds"],
-      "lef": ["macros/CFGMEM_IHP_LEFT16/CFGMEM_IHP_LEFT16.lef"],
-      "nl": ["macros/CFGMEM_IHP_LEFT16/CFGMEM_IHP_LEFT16.nl.v"],
+      "gds": [
+        "macros/CFGMEM_IHP_LEFT16/CFGMEM_IHP_LEFT16.gds"
+      ],
+      "lef": [
+        "macros/CFGMEM_IHP_LEFT16/CFGMEM_IHP_LEFT16.lef"
+      ],
+      "nl": [
+        "macros/CFGMEM_IHP_LEFT16/CFGMEM_IHP_LEFT16.nl.v"
+      ],
       "spef": {
-        "nom_*": ["macros/CFGMEM_IHP_LEFT16/spef/CFGMEM_IHP_LEFT16.nom.spef"]
+        "nom_*": [
+          "macros/CFGMEM_IHP_LEFT16/spef/CFGMEM_IHP_LEFT16.nom.spef"
+        ]
       },
       "lib": {
-        "nom_typ_1p20V_25C": ["macros/CFGMEM_IHP_LEFT16/lib/CFGMEM_IHP_LEFT16__nom_typ_1p20V_25C.lib"],
-        "nom_fast_1p32V_m40C": ["macros/CFGMEM_IHP_LEFT16/lib/CFGMEM_IHP_LEFT16__nom_fast_1p32V_m40C.lib"],
-        "nom_slow_1p08V_125C": ["macros/CFGMEM_IHP_LEFT16/lib/CFGMEM_IHP_LEFT16__nom_slow_1p08V_125C.lib"]
+        "nom_typ_1p20V_25C": [
+          "macros/CFGMEM_IHP_LEFT16/lib/CFGMEM_IHP_LEFT16__nom_typ_1p20V_25C.lib"
+        ],
+        "nom_fast_1p32V_m40C": [
+          "macros/CFGMEM_IHP_LEFT16/lib/CFGMEM_IHP_LEFT16__nom_fast_1p32V_m40C.lib"
+        ],
+        "nom_slow_1p08V_125C": [
+          "macros/CFGMEM_IHP_LEFT16/lib/CFGMEM_IHP_LEFT16__nom_slow_1p08V_125C.lib"
+        ]
       }
     },
     "CFGMEM_IHP16": {
       "instances": {
         "i_peripherals.CFGMEMS[2].cfgmem_lo": {
-          "location": [955.20, 3.78],
+          "location": [
+            955.2,
+            3.78
+          ],
           "orientation": "FS"
         },
         "i_peripherals.CFGMEMS[2].cfgmem_hi": {
-          "location": [955.20, 257.04],
+          "location": [
+            955.2,
+            257.04
+          ],
           "orientation": "N"
         },
         "i_peripherals.CFGMEMS[3].cfgmem_lo": {
-          "location": [955.20, 366.66],
+          "location": [
+            955.2,
+            366.66
+          ],
           "orientation": "FS"
         },
         "i_peripherals.CFGMEMS[3].cfgmem_hi": {
-          "location": [955.20, 619.92],
+          "location": [
+            955.2,
+            619.92
+          ],
           "orientation": "N"
         }
       },
-      "gds": ["macros/CFGMEM_IHP16/CFGMEM_IHP16.gds"],
-      "lef": ["macros/CFGMEM_IHP16/CFGMEM_IHP16.lef"],
-      "nl": ["macros/CFGMEM_IHP16/CFGMEM_IHP16.nl.v"],
+      "gds": [
+        "macros/CFGMEM_IHP16/CFGMEM_IHP16.gds"
+      ],
+      "lef": [
+        "macros/CFGMEM_IHP16/CFGMEM_IHP16.lef"
+      ],
+      "nl": [
+        "macros/CFGMEM_IHP16/CFGMEM_IHP16.nl.v"
+      ],
       "spef": {
-        "nom_*": ["macros/CFGMEM_IHP16/spef/CFGMEM_IHP16.nom.spef"]
+        "nom_*": [
+          "macros/CFGMEM_IHP16/spef/CFGMEM_IHP16.nom.spef"
+        ]
       },
       "lib": {
-        "nom_typ_1p20V_25C": ["macros/CFGMEM_IHP16/lib/CFGMEM_IHP16__nom_typ_1p20V_25C.lib"],
-        "nom_fast_1p32V_m40C": ["macros/CFGMEM_IHP16/lib/CFGMEM_IHP16__nom_fast_1p32V_m40C.lib"],
-        "nom_slow_1p08V_125C": ["macros/CFGMEM_IHP16/lib/CFGMEM_IHP16__nom_slow_1p08V_125C.lib"]
+        "nom_typ_1p20V_25C": [
+          "macros/CFGMEM_IHP16/lib/CFGMEM_IHP16__nom_typ_1p20V_25C.lib"
+        ],
+        "nom_fast_1p32V_m40C": [
+          "macros/CFGMEM_IHP16/lib/CFGMEM_IHP16__nom_fast_1p32V_m40C.lib"
+        ],
+        "nom_slow_1p08V_125C": [
+          "macros/CFGMEM_IHP16/lib/CFGMEM_IHP16__nom_slow_1p08V_125C.lib"
+        ]
       }
     },
     "RM_IHPSG13_1P_512x32_c2_bm_bist": {
       "instances": {
         "i_peripherals.i_prism.SRAM[0].M512.i_sram": {
-          "location": [3.36, 3.78],
+          "location": [
+            3.36,
+            3.78
+          ],
           "orientation": "FS"
-        },
-        "i_peripherals.i_prism.SRAM[1].M512.i_sram": {
-          "location": [3.36, 340.2],
-          "orientation": "N"
         }
       },
-      "gds": ["macros/RM_IHPSG13_1P_512x32_c2_bm_bist/RM_IHPSG13_1P_512x32_c2_bm_bist.gds"],
-      "lef": ["pdk_dir::libs.ref/sg13g2_sram/lef/RM_IHPSG13_1P_512x32_c2_bm_bist.lef"],
+      "gds": [
+        "macros/RM_IHPSG13_1P_512x32_c2_bm_bist/RM_IHPSG13_1P_512x32_c2_bm_bist.gds"
+      ],
+      "lef": [
+        "pdk_dir::libs.ref/sg13g2_sram/lef/RM_IHPSG13_1P_512x32_c2_bm_bist.lef"
+      ],
       "nl": [],
       "spef": [],
-      "spice": ["pdk_dir::libs.ref/sg13g2_sram/cdl/RM_IHPSG13_1P_512x32_c2_bm_bist.cdl"],
+      "spice": [
+        "pdk_dir::libs.ref/sg13g2_sram/cdl/RM_IHPSG13_1P_512x32_c2_bm_bist.cdl"
+      ],
       "lib": {
         "nom_typ_1p20V_25C": [
           "pdk_dir::libs.ref/sg13g2_sram/lib/RM_IHPSG13_1P_512x32_c2_bm_bist_typ_1p20V_25C.lib"
@@ -179,14 +230,19 @@
     "i_peripherals\\.CFGMEMS\\\\?\\[3\\\\?\\]\\.cfgmem_lo VPWR VGND VPWR VGND",
     "i_peripherals\\.CFGMEMS\\\\?\\[3\\\\?\\]\\.cfgmem_hi VPWR VGND VPWR VGND",
     "i_peripherals\\.i_prism\\.SRAM\\\\?\\[0\\\\?\\]\\.M512\\.i_sram VPWR VGND VDD! VSS!",
-    "i_peripherals\\.i_prism\\.SRAM\\\\?\\[0\\\\?\\]\\.M512\\.i_sram VPWR VGND VDDARRAY! VSS!",
-    "i_peripherals\\.i_prism\\.SRAM\\\\?\\[1\\\\?\\]\\.M512\\.i_sram VPWR VGND VDD! VSS!",
-    "i_peripherals\\.i_prism\\.SRAM\\\\?\\[1\\\\?\\]\\.M512\\.i_sram VPWR VGND VDDARRAY! VSS!"
+    "i_peripherals\\.i_prism\\.SRAM\\\\?\\[0\\\\?\\]\\.M512\\.i_sram VPWR VGND VDDARRAY! VSS!"
   ],
   "MAX_TRANSITION_CONSTRAINT": 0.75,
   "MAX_FANOUT_CONSTRAINT": 8,
-  "PNR_CORNERS": ["nom_typ_1p20V_25C", "nom_slow_1p08V_125C"],
-  "VERILOG_DEFINES": ["PRISM_SRAM_AW=9", "PRISM_SRAM_FIFO=2", "IHP_SG13G2"],
+  "PNR_CORNERS": [
+    "nom_typ_1p20V_25C",
+    "nom_slow_1p08V_125C"
+  ],
+  "VERILOG_DEFINES": [
+    "PRISM_SRAM_AW=9",
+    "IHP_SG13G2",
+    "PRISM_SRAM_FIFO=1"
+  ],
   "RUN_MAGIC_DRC": 0,
   "//sram_gds": "The SRAM GDS is a local copy of the PDK's with its PR boundary moved from layer 235/4 (older IHP release, unknown to Magic's tech and to the Tiny Tapeout layer whitelist) to 189/4, as in the CMOS5L PDK copy of the same macro",
   "KLAYOUT_DRC_RUNSET": "pdk_dir::libs.tech/klayout/tech/drc/ihp-sg13g2.drc",
@@ -194,7 +250,6 @@
   "PL_RESIZER_SETUP_SLACK_MARGIN": 0.25,
   "DIODE_PADDING": 2,
   "DPL_CELL_PADDING": 2,
-  "//": "DPL_CELL_PADDING 2 pads only the antenna diodes: every other cell class is excluded (padding all cells made the left-column pin-row strip worse in run 21, 633 -> 1000+ violations in its hottest bin)",
   "CELL_PAD_EXCLUDE": [
     "CFGMEM*",
     "sg13g2_a2*",
@@ -223,5 +278,6 @@
     "sg13g2_tielo*",
     "sg13g2_xnor*",
     "sg13g2_xor*"
-  ]
+  ],
+  "//one_sram": "One SRAM (PRISM_SRAM_FIFO=1, the shared FIFO; the tracer uses it too): the second macro, its routing obstructions and its power connections are gone, which returns 80k um2 to the rows, so the standard cells need about 74% of what the macros leave and the placer target is 78."
 }

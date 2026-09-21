@@ -13,7 +13,7 @@ PROJECT_SOURCES = project.v peri*.v tinyQV/cpu/*.v tinyQV/peri/uart/uart_tx.v us
 # need a FIFO are skipped when there is none), so it is set and exported
 # outside the RTL / gate-level branches.
 PRISM_SRAM_AW ?= 9
-PRISM_SRAM_FIFO ?= 2
+PRISM_SRAM_FIFO ?= 1
 export PRISM_SRAM_FIFO
 
 # The PDK's behavioural SRAM models, vendored so the GitHub test jobs

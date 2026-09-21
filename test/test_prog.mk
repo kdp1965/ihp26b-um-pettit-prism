@@ -18,7 +18,7 @@ COMPILE_ARGS +=  -DPROG_FILE=\"$(PROG_FILE)\"
 # need a FIFO are skipped when there is none), so it is set and exported
 # outside the RTL / gate-level branches.
 PRISM_SRAM_AW ?= 9
-PRISM_SRAM_FIFO ?= 2
+PRISM_SRAM_FIFO ?= 1
 export PRISM_SRAM_FIFO
 
 # The PDK's behavioural SRAM models, vendored so the GitHub test jobs
