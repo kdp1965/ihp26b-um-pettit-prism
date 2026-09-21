@@ -88,6 +88,7 @@ class MouthKeepouts(OdbpyStep):
         Variable("MOUTH_KEEPOUT_MAX_DENSITY", Decimal, "Cell density cap of the soft blockage; 0 makes it a hard blockage.", default=Decimal("0.25")),
         Variable("MOUTH_KEEPOUT_MACRO_PREFIX", str, "Master-name prefix of the macros forming the columns.", default="CFGMEM"),
         Variable("MOUTH_KEEPOUT_INWARD", Decimal, "Extension of the keep-out inward from the column edge, over the gap between the two macros.", units="µm", default=0),
+        Variable("MOUTH_KEEPOUT_GAPS", str, "Which gaps of a column get a keep-out, as indices from the bottom (0 = between the two lowest macros), comma separated; empty = every gap.", default=""),
     ]
 
     def get_script_path(self):
@@ -100,6 +101,7 @@ class MouthKeepouts(OdbpyStep):
             "--margin", str(self.config["MOUTH_KEEPOUT_MARGIN"]),
             "--max-density", str(self.config["MOUTH_KEEPOUT_MAX_DENSITY"]),
             "--inward", str(self.config["MOUTH_KEEPOUT_INWARD"]),
+            "--gaps", self.config["MOUTH_KEEPOUT_GAPS"],
         ]
 
 

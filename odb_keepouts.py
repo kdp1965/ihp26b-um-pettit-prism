@@ -42,8 +42,9 @@ from reader import click_odb
 @click.option("--margin", default=20.0, type=float, help="Extension of the keep-out into each macro's height (um)")
 @click.option("--max-density", default=0.25, type=float, help="Soft blockage density cap (0 = hard blockage)")
 @click.option("--inward", default=0.0, type=float, help="Extension of the keep-out inward from the column edge, over the gap between the macros (um)")
+@click.option("--gaps", default="", help="Which gaps of a column get a keep-out, as indices from the bottom (0 = between the two lowest macros), comma separated; empty = all")
 @click_odb
-def main(reader, macro_prefix, width, margin, max_density, inward):
+def main(reader, macro_prefix, width, margin, max_density, inward, gaps):
     block = reader.block
     u = block.getDbUnitsPerMicron()
     core = block.getCoreArea()
@@ -73,7 +74,11 @@ def main(reader, macro_prefix, width, margin, max_density, inward):
         kx0, kx1 = (x1 - inw, x1 + int(width * u)) if facing_east else (x0 - int(width * u), x0 + inw)
         kx0, kx1 = max(kx0, core.xMin()), min(kx1, core.xMax())
         insts = sorted(insts, key=lambda i: i.getBBox().yMin())
-        for lower, upper in zip(insts, insts[1:]):
+        wanted = {int(g) for g in gaps.split(",") if g.strip() != ""}
+        for gap, (lower, upper) in enumerate(zip(insts, insts[1:])):
+            if wanted and gap not in wanted:
+                print(f"gap {gap} beside {lower.getName()} / {upper.getName()}: no keep-out (not in --gaps)")
+                continue
             lb, ub = lower.getBBox(), upper.getBBox()
             ky0 = max(core.yMin(), lb.yMax() - int(margin * u))
             ky1 = min(core.yMax(), ub.yMin() + int(margin * u))

@@ -8,7 +8,7 @@ project:
   clock_hz:     64000000       # Clock frequency in Hz (or 0 if not applicable)
 
   # How many tiles your design occupies? A single tile is about 167x108 uM.
-  tiles: "8x4"          # sg13g2 variant of the full 8x4 design (SRAM FIFOs, tracing)
+  tiles: "6x4"          # the full design (both SRAM FIFOs, tracing) squeezed onto 6x4: an experiment, see src/config.json
 
   # Your top module name must start with "tt_um_". Make it unique by including your github username:
   top_module:  "tt_um_pettit_js_prism"
